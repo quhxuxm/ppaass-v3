@@ -1,0 +1,19 @@
+[package]
+name = "server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ppaass-common = { path = "../common", package = "common" }
+ppaass-protocol = { path = "../protocol", package = "protocol" }
+tokio = { workspace = true, features = ["full"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+thiserror = { workspace = true }
+accessory = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+pin-project = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+futures-util = { workspace = true, features = ["sink"] }
+bincode = { workspace = true }

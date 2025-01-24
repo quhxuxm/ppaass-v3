@@ -1,0 +1,12 @@
+[package]
+name = "common"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+uuid = { workspace = true, features = ["v4"] }
+rand = { workspace = true }
+thiserror = { workspace = true }
+aes = { workspace = true }
+rsa = { workspace = true }
+cipher = { workspace = true, features = ["block-padding", "alloc"] }
