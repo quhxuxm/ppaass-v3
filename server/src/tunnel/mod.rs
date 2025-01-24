@@ -1,8 +1,9 @@
 use crate::error::ServerError;
 use crate::tunnel::agent::{AgentTcpConnection, AgentTcpConnectionRead};
 use crate::tunnel::destination::DestinationEdge;
-use crate::{ServerConfig, ServerRsaCryptoRepo};
+use crate::ServerConfig;
 use futures_util::StreamExt;
+use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_protocol::{TunnelInitRequest, UdpRelayDataRequest};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -11,18 +12,24 @@ use tracing::error;
 mod agent;
 mod destination;
 
-pub struct Tunnel {
+pub struct Tunnel<T>
+where
+    T: RsaCryptoRepository + Send + Sync + 'static,
+{
     config: Arc<ServerConfig>,
-    agent_tcp_connection: AgentTcpConnection<ServerRsaCryptoRepo>,
+    agent_tcp_connection: AgentTcpConnection<T>,
     agent_socket_address: SocketAddr,
 }
 
-impl Tunnel {
+impl<T> Tunnel<T>
+where
+    T: RsaCryptoRepository + Send + Sync + 'static,
+{
     pub fn new(
         config: Arc<ServerConfig>,
         agent_tcp_stream: TcpStream,
         agent_socket_address: SocketAddr,
-        rsa_crypto_repo: Arc<ServerRsaCryptoRepo>,
+        rsa_crypto_repo: Arc<T>,
     ) -> Self {
         let agent_tcp_connection =
             AgentTcpConnection::new(agent_tcp_stream, agent_socket_address, rsa_crypto_repo);
@@ -34,9 +41,9 @@ impl Tunnel {
     }
 
     async fn initialize_tunnel(
-        agent_tcp_connection: AgentTcpConnection<ServerRsaCryptoRepo>,
+        agent_tcp_connection: AgentTcpConnection<T>,
         agent_socket_address: SocketAddr,
-    ) -> Result<(AgentTcpConnectionRead, DestinationEdge), ServerError> {
+    ) -> Result<(AgentTcpConnectionRead<T>, DestinationEdge<T>), ServerError> {
         let (agent_tcp_connection_write, mut agent_tcp_connection_read) =
             agent_tcp_connection.split();
         let agent_data = agent_tcp_connection_read
@@ -65,8 +72,8 @@ impl Tunnel {
     }
 
     async fn relay(
-        mut agent_tcp_connection_read: AgentTcpConnectionRead,
-        destination_edge: DestinationEdge,
+        mut agent_tcp_connection_read: AgentTcpConnectionRead<T>,
+        destination_edge: DestinationEdge<T>,
     ) -> Result<(), ServerError> {
         match destination_edge {
             DestinationEdge::Tcp(destination_tcp_connection_write, destination_read_guard) => {

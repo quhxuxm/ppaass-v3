@@ -1,20 +1,26 @@
 use crate::error::ServerError;
-use crate::rsa::ServerRsaCryptoRepo;
 use crate::tunnel::Tunnel;
 use crate::ServerConfig;
+use ppaass_common::crypto::RsaCryptoRepository;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Builder;
 use tracing::{debug, error, info};
-pub struct Server {
+pub struct Server<T>
+where
+    T: RsaCryptoRepository + Send + Sync + 'static,
+{
     config: Arc<ServerConfig>,
-    rsa_crypto_repo: Arc<ServerRsaCryptoRepo>,
+    rsa_crypto_repo: Arc<T>,
 }
 
-impl Server {
-    pub fn new(config: Arc<ServerConfig>, rsa_crypto_repo: Arc<ServerRsaCryptoRepo>) -> Server {
-        Server {
+impl<T> Server<T>
+where
+    T: RsaCryptoRepository + Send + Sync + 'static,
+{
+    pub fn new(config: Arc<ServerConfig>, rsa_crypto_repo: Arc<T>) -> Self {
+        Self {
             config,
             rsa_crypto_repo,
         }
@@ -80,7 +86,7 @@ impl Server {
 
     async fn handle_agent_connection(
         config: Arc<ServerConfig>,
-        rsa_crypto_repo: Arc<ServerRsaCryptoRepo>,
+        rsa_crypto_repo: Arc<T>,
         agent_tcp_stream: TcpStream,
         agent_socket_address: SocketAddr,
     ) -> Result<(), ServerError> {

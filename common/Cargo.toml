@@ -10,3 +10,6 @@ thiserror = { workspace = true }
 aes = { workspace = true }
 rsa = { workspace = true }
 cipher = { workspace = true, features = ["block-padding", "alloc"] }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true, features = ["chrono"] }
+tracing-appender = { workspace = true }

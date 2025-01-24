@@ -1,0 +1,7 @@
+ip_v6 = false
+port = 80
+worker_threads = 64
+log_dir = "log"
+log_name_prefix = "ppaass-server-v3"
+max_log_level = "debug"
+rsa_dir = "resources/rsa"

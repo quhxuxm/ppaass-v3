@@ -1,6 +1,5 @@
 use crate::error::ServerError;
 use crate::tunnel::agent::codec::HandshakeCodec;
-use crate::ServerRsaCryptoRepo;
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{Sink, StreamExt};
 use futures_util::{SinkExt, Stream};
@@ -16,8 +15,8 @@ use tokio::net::TcpStream;
 use tokio::pin;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Framed, FramedParts, LengthDelimitedCodec};
-pub type AgentTcpConnectionWrite = SplitSink<AgentTcpConnection<ServerRsaCryptoRepo>, BytesMut>;
-pub type AgentTcpConnectionRead = SplitStream<AgentTcpConnection<ServerRsaCryptoRepo>>;
+pub type AgentTcpConnectionWrite<R> = SplitSink<AgentTcpConnection<R>, BytesMut>;
+pub type AgentTcpConnectionRead<R> = SplitStream<AgentTcpConnection<R>>;
 pub enum AgentTcpConnection<R>
 where
     R: RsaCryptoRepository + Sync + Send + 'static,
