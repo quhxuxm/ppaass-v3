@@ -1,5 +1,7 @@
 use crate::error::ServerError;
 use crate::tunnel::agent::codec::HandshakeCodec;
+use crate::ServerRsaCryptoRepo;
+use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{Sink, StreamExt};
 use futures_util::{SinkExt, Stream};
 use ppaass_common::crypto::{decrypt_with_aes, encrypt_with_aes, RsaCryptoRepository};
@@ -7,20 +9,23 @@ use ppaass_common::random_32_bytes;
 use ppaass_protocol::{Encryption, HandshakeRequest, HandshakeResponse};
 use std::net::SocketAddr;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{ready, Context, Poll};
 use tokio::io::AsyncWrite;
 use tokio::net::TcpStream;
 use tokio::pin;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Framed, FramedParts, LengthDelimitedCodec};
-pub enum AgentConnection<'r, R>
+pub type AgentTcpConnectionWrite = SplitSink<AgentTcpConnection<ServerRsaCryptoRepo>, BytesMut>;
+pub type AgentTcpConnectionRead = SplitStream<AgentTcpConnection<ServerRsaCryptoRepo>>;
+pub enum AgentTcpConnection<R>
 where
     R: RsaCryptoRepository + Sync + Send + 'static,
 {
     New {
         agent_tcp_stream: Option<TcpStream>,
         agent_socket_address: SocketAddr,
-        rsa_crypto_repo: &'r R,
+        rsa_crypto_repo: Arc<R>,
     },
     Handshaked {
         agent_tcp_framed: Framed<TcpStream, LengthDelimitedCodec>,
@@ -28,18 +33,17 @@ where
         authentication: String,
         agent_encryption: Encryption,
         server_encryption: Encryption,
-        rsa_crypto_repo: &'r R,
     },
 }
 
-impl<'r, R> AgentConnection<'r, R>
+impl<R> AgentTcpConnection<R>
 where
     R: RsaCryptoRepository + Sync + Send + 'static,
 {
     pub fn new(
         agent_tcp_stream: TcpStream,
         agent_socket_address: SocketAddr,
-        rsa_crypto_repo: &'r R,
+        rsa_crypto_repo: Arc<R>,
     ) -> Self {
         Self::New {
             agent_tcp_stream: Some(agent_tcp_stream),
@@ -51,8 +55,8 @@ where
     /// Handshake
     pub async fn handshake(&mut self) -> Result<(), ServerError> {
         match self {
-            AgentConnection::Handshaked { .. } => Ok(()),
-            AgentConnection::New {
+            AgentTcpConnection::Handshaked { .. } => Ok(()),
+            AgentTcpConnection::New {
                 agent_tcp_stream,
                 agent_socket_address,
                 rsa_crypto_repo,
@@ -95,13 +99,12 @@ where
                     io: agent_tcp_stream,
                     ..
                 } = handshake_framed.into_parts();
-                *self = AgentConnection::Handshaked {
+                *self = AgentTcpConnection::Handshaked {
                     agent_tcp_framed: Framed::new(agent_tcp_stream, LengthDelimitedCodec::new()),
                     agent_socket_address: *agent_socket_address,
                     authentication,
                     agent_encryption,
                     server_encryption,
-                    rsa_crypto_repo,
                 };
                 Ok(())
             }
@@ -109,15 +112,15 @@ where
     }
 }
 
-impl<'r, R> Stream for AgentConnection<'r, R>
+impl<R> Stream for AgentTcpConnection<R>
 where
     R: RsaCryptoRepository + Sync + Send + 'static,
 {
     type Item = Result<BytesMut, ServerError>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.get_mut() {
-            AgentConnection::New { .. } => Poll::Pending,
-            AgentConnection::Handshaked {
+            AgentTcpConnection::New { .. } => Poll::Pending,
+            AgentTcpConnection::Handshaked {
                 agent_tcp_framed,
                 agent_encryption,
                 ..
@@ -146,15 +149,15 @@ where
     }
 }
 
-impl<'r, R> Sink<BytesMut> for AgentConnection<'r, R>
+impl<R> Sink<BytesMut> for AgentTcpConnection<R>
 where
     R: RsaCryptoRepository + Sync + Send + 'static,
 {
     type Error = ServerError;
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         match self.get_mut() {
-            AgentConnection::New { .. } => Poll::Pending,
-            AgentConnection::Handshaked {
+            AgentTcpConnection::New { .. } => Poll::Pending,
+            AgentTcpConnection::Handshaked {
                 agent_tcp_framed, ..
             } => agent_tcp_framed.poll_ready_unpin(cx).map_err(Into::into),
         }
@@ -162,13 +165,13 @@ where
 
     fn start_send(self: Pin<&mut Self>, item: BytesMut) -> Result<(), Self::Error> {
         match self.get_mut() {
-            AgentConnection::New {
+            AgentTcpConnection::New {
                 agent_socket_address,
                 ..
             } => Err(ServerError::Other(format!(
                 "Agent connection still not handshake: {agent_socket_address}"
             ))),
-            AgentConnection::Handshaked {
+            AgentTcpConnection::Handshaked {
                 agent_tcp_framed,
                 server_encryption,
                 ..
@@ -188,15 +191,15 @@ where
     }
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         match self.get_mut() {
-            AgentConnection::New { .. } => Poll::Pending,
-            AgentConnection::Handshaked {
+            AgentTcpConnection::New { .. } => Poll::Pending,
+            AgentTcpConnection::Handshaked {
                 agent_tcp_framed, ..
             } => agent_tcp_framed.poll_flush_unpin(cx).map_err(Into::into),
         }
     }
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         match self.get_mut() {
-            AgentConnection::New {
+            AgentTcpConnection::New {
                 agent_tcp_stream, ..
             } => match agent_tcp_stream {
                 None => Poll::Ready(Ok(())),
@@ -205,7 +208,7 @@ where
                     agent_tcp_stream.poll_shutdown(cx).map_err(Into::into)
                 }
             },
-            AgentConnection::Handshaked {
+            AgentTcpConnection::Handshaked {
                 agent_tcp_framed, ..
             } => agent_tcp_framed.poll_close_unpin(cx).map_err(Into::into),
         }

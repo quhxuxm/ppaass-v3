@@ -88,7 +88,7 @@ impl Server {
             config,
             agent_tcp_stream,
             agent_socket_address,
-            rsa_crypto_repo.as_ref(),
+            rsa_crypto_repo,
         );
         tunnel.run().await
     }

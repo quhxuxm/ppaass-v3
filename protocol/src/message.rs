@@ -38,24 +38,6 @@ pub struct HandshakeResponse {
     pub encryption: Encryption,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// The request packet from agent
-pub enum AgentRequestPacket {
-    /// The destination init request
-    Init(TunnelInitRequest),
-    /// The relay data request
-    Relay(TunnelRelayDataRequest),
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-/// The response packet send to agent
-pub enum AgentResponsePacket {
-    /// The destination init response
-    Init(TunnelInitResponse),
-    /// The relay data response
-    Relay(TunnelRelayDataResponse),
-}
-
 /// The tcp destination initialize message used to initialize the destination
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum TunnelInitRequest {
@@ -87,25 +69,15 @@ pub enum TunnelInitResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum TunnelRelayDataRequest {
-    /// The relay data for tcp destination
-    Tcp(Vec<u8>),
-    /// The relay data for udp destination
-    Udp {
-        destination_address: UnifiedAddress,
-        source_address: UnifiedAddress,
-        payload: Vec<u8>,
-    },
+pub struct UdpRelayDataRequest {
+    pub destination_address: UnifiedAddress,
+    pub source_address: UnifiedAddress,
+    pub payload: Vec<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum TunnelRelayDataResponse {
-    /// The relay data for tcp destination
-    Tcp(Vec<u8>),
-    /// The relay data for udp destination
-    Udp {
-        destination_address: UnifiedAddress,
-        source_address: UnifiedAddress,
-        payload: Vec<u8>,
-    },
+pub struct UdpRelayDataResponse {
+    pub destination_address: UnifiedAddress,
+    pub source_address: UnifiedAddress,
+    pub payload: Vec<u8>,
 }
