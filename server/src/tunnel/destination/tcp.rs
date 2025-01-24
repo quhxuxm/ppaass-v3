@@ -1,5 +1,5 @@
 use crate::error::ServerError;
-use futures_util::stream::{SplitSink, SplitStream};
+use futures_util::stream::SplitSink;
 use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use ppaass_protocol::UnifiedAddress;
 use std::net::SocketAddr;
@@ -8,7 +8,7 @@ use std::task::{Context, Poll};
 use tokio::net::TcpStream;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{BytesCodec, Framed};
-pub type DestinationTcpEndpointRead = SplitStream<DestinationTcpEndpoint>;
+use tracing::debug;
 pub type DestinationTcpEndpointWrite = SplitSink<DestinationTcpEndpoint, BytesMut>;
 pub struct DestinationTcpEndpoint {
     destination_tcp_framed: Framed<TcpStream, BytesCodec>,
@@ -19,6 +19,7 @@ impl DestinationTcpEndpoint {
     pub async fn connect(destination_address: UnifiedAddress) -> Result<Self, ServerError> {
         let destination_socks_addrs: Vec<SocketAddr> = destination_address.clone().try_into()?;
         let destination_tcp_stream = TcpStream::connect(destination_socks_addrs.as_slice()).await?;
+        debug!("Connected to destination success: {}", destination_address);
         Ok(DestinationTcpEndpoint {
             destination_address,
             destination_tcp_framed: Framed::new(destination_tcp_stream, BytesCodec::new()),
