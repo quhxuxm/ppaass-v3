@@ -63,7 +63,7 @@ where
                 let agent_tcp_stream = agent_tcp_stream.take().ok_or(ProxyError::Other(
                     format!("Fail to get agent tcp stream from object: {agent_socket_address}"),
                 ))?;
-                let mut handshake_framed = Framed::new(agent_tcp_stream, HandshakeCodec);
+                let mut handshake_framed = Framed::new(agent_tcp_stream, HandshakeCodec::new());
                 let HandshakeRequest {
                     authentication,
                     encryption,
