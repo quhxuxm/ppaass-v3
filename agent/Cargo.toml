@@ -4,3 +4,12 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ppaass-common = { path = "../common", package = "common" }
+ppaass-protocol = { path = "../protocol", package = "protocol" }
+hyper = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+thiserror = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+accessory = { workspace = true }
+clap = { workspace = true, features = ["derive"] }
+toml = { workspace = true }
