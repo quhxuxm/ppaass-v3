@@ -1,6 +1,8 @@
 use crate::command::Command;
 use crate::config::AgentConfig;
+use crate::server::Server;
 use clap::Parser;
+use log::error;
 use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::init_logger;
 use std::fs::read_to_string;
