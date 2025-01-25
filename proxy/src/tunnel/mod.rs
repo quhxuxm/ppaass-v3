@@ -1,7 +1,7 @@
-use crate::error::ServerError;
+use crate::error::ProxyError;
 use crate::tunnel::agent::{AgentTcpConnection, AgentTcpConnectionRead};
 use crate::tunnel::destination::DestinationEdge;
-use crate::ServerConfig;
+use crate::ProxyConfig;
 use futures_util::StreamExt;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_protocol::{TunnelInitRequest, UdpRelayDataRequest};
@@ -16,7 +16,7 @@ pub struct Tunnel<T>
 where
     T: RsaCryptoRepository + Send + Sync + 'static,
 {
-    config: Arc<ServerConfig>,
+    config: Arc<ProxyConfig>,
     agent_tcp_connection: AgentTcpConnection<T>,
     agent_socket_address: SocketAddr,
 }
@@ -26,7 +26,7 @@ where
     T: RsaCryptoRepository + Send + Sync + 'static,
 {
     pub fn new(
-        config: Arc<ServerConfig>,
+        config: Arc<ProxyConfig>,
         agent_tcp_stream: TcpStream,
         agent_socket_address: SocketAddr,
         rsa_crypto_repo: Arc<T>,
@@ -43,13 +43,13 @@ where
     async fn initialize_tunnel(
         agent_tcp_connection: AgentTcpConnection<T>,
         agent_socket_address: SocketAddr,
-    ) -> Result<(AgentTcpConnectionRead<T>, DestinationEdge<T>), ServerError> {
+    ) -> Result<(AgentTcpConnectionRead<T>, DestinationEdge<T>), ProxyError> {
         let (agent_tcp_connection_write, mut agent_tcp_connection_read) =
             agent_tcp_connection.split();
         let agent_data = agent_tcp_connection_read
             .next()
             .await
-            .ok_or(ServerError::AgentConnectionExhausted(agent_socket_address))??;
+            .ok_or(ProxyError::AgentConnectionExhausted(agent_socket_address))??;
         let tunnel_init_request: TunnelInitRequest = bincode::deserialize(&agent_data)?;
         match tunnel_init_request {
             TunnelInitRequest::Tcp {
@@ -74,7 +74,7 @@ where
     async fn relay(
         mut agent_tcp_connection_read: AgentTcpConnectionRead<T>,
         destination_edge: DestinationEdge<T>,
-    ) -> Result<(), ServerError> {
+    ) -> Result<(), ProxyError> {
         match destination_edge {
             DestinationEdge::Tcp(destination_tcp_connection_write, destination_read_guard) => {
                 if let Err(e) = agent_tcp_connection_read
@@ -104,7 +104,7 @@ where
         }
         Ok(())
     }
-    pub async fn run(mut self) -> Result<(), ServerError> {
+    pub async fn run(mut self) -> Result<(), ProxyError> {
         self.agent_tcp_connection.handshake().await?;
         let (agent_tcp_connection_read, destination_edge) =
             Self::initialize_tunnel(self.agent_tcp_connection, self.agent_socket_address).await?;

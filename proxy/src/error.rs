@@ -3,7 +3,7 @@ use ppaass_protocol::ProtocolError;
 use std::net::SocketAddr;
 use thiserror::Error;
 #[derive(Debug, Error)]
-pub enum ServerError {
+pub enum ProxyError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]

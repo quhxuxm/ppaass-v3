@@ -1,6 +1,6 @@
-use crate::error::ServerError;
+use crate::error::ProxyError;
 use crate::tunnel::Tunnel;
-use crate::ServerConfig;
+use crate::ProxyConfig;
 use ppaass_common::crypto::RsaCryptoRepository;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
@@ -11,7 +11,7 @@ pub struct Server<T>
 where
     T: RsaCryptoRepository + Send + Sync + 'static,
 {
-    config: Arc<ServerConfig>,
+    config: Arc<ProxyConfig>,
     rsa_crypto_repo: Arc<T>,
 }
 
@@ -19,30 +19,30 @@ impl<T> Server<T>
 where
     T: RsaCryptoRepository + Send + Sync + 'static,
 {
-    pub fn new(config: Arc<ServerConfig>, rsa_crypto_repo: Arc<T>) -> Self {
+    pub fn new(config: Arc<ProxyConfig>, rsa_crypto_repo: Arc<T>) -> Self {
         Self {
             config,
             rsa_crypto_repo,
         }
     }
 
-    pub fn run(self) -> Result<(), ServerError> {
+    pub fn run(self) -> Result<(), ProxyError> {
         let runtime = Builder::new_multi_thread()
             .enable_all()
             .worker_threads(*self.config.worker_threads())
             .build()?;
         runtime.block_on(async move {
             if let Err(e) = self.running_server().await {
-                error!("Fail to start server: {}", e);
+                error!("Fail to start proxy: {}", e);
             }
         });
         Ok(())
     }
 
-    async fn running_server(self) -> Result<(), ServerError> {
+    async fn running_server(self) -> Result<(), ProxyError> {
         let listener = if *self.config.ip_v6() {
             debug!(
-                "Starting server listener with IPv6 on port: {}",
+                "Starting proxy listener with IPv6 on port: {}",
                 self.config.port()
             );
             TcpListener::bind(SocketAddr::new(
@@ -52,7 +52,7 @@ where
             .await?
         } else {
             debug!(
-                "Starting server listener with IPv4 on port: {}",
+                "Starting proxy listener with IPv4 on port: {}",
                 self.config.port()
             );
             TcpListener::bind(SocketAddr::new(
@@ -85,11 +85,11 @@ where
     }
 
     async fn handle_agent_connection(
-        config: Arc<ServerConfig>,
+        config: Arc<ProxyConfig>,
         rsa_crypto_repo: Arc<T>,
         agent_tcp_stream: TcpStream,
         agent_socket_address: SocketAddr,
-    ) -> Result<(), ServerError> {
+    ) -> Result<(), ProxyError> {
         let tunnel = Tunnel::new(
             config,
             agent_tcp_stream,

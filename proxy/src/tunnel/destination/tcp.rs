@@ -1,4 +1,4 @@
-use crate::error::ServerError;
+use crate::error::ProxyError;
 use futures_util::stream::SplitSink;
 use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use ppaass_protocol::UnifiedAddress;
@@ -16,7 +16,7 @@ pub struct DestinationTcpEndpoint {
 }
 
 impl DestinationTcpEndpoint {
-    pub async fn connect(destination_address: UnifiedAddress) -> Result<Self, ServerError> {
+    pub async fn connect(destination_address: UnifiedAddress) -> Result<Self, ProxyError> {
         let destination_socks_addrs: Vec<SocketAddr> = destination_address.clone().try_into()?;
         let destination_tcp_stream = TcpStream::connect(destination_socks_addrs.as_slice()).await?;
         debug!("Connected to destination success: {}", destination_address);
@@ -28,7 +28,7 @@ impl DestinationTcpEndpoint {
 }
 
 impl Stream for DestinationTcpEndpoint {
-    type Item = Result<BytesMut, ServerError>;
+    type Item = Result<BytesMut, ProxyError>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         self.get_mut()
             .destination_tcp_framed
@@ -38,7 +38,7 @@ impl Stream for DestinationTcpEndpoint {
 }
 
 impl Sink<BytesMut> for DestinationTcpEndpoint {
-    type Error = ServerError;
+    type Error = ProxyError;
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         SinkExt::<BytesMut>::poll_ready_unpin(&mut self.get_mut().destination_tcp_framed, cx)
             .map_err(Into::into)

@@ -1,5 +1,5 @@
 [workspace]
-members = ["agent", "common", "protocol", "server"]
+members = ["agent", "common", "protocol", "proxy"]
 resolver = "2"
 [workspace.dependencies]
 tokio = "1.43.0"

@@ -34,7 +34,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?);
     let server = Server::new(config, rsa_crypto_repo);
     if let Err(e) = server.run() {
-        error!("Fail to run server: {:?}", e);
+        error!("Fail to run proxy: {:?}", e);
     };
     Ok(())
 }

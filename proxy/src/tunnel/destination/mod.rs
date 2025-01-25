@@ -1,6 +1,6 @@
 mod tcp;
 mod udp;
-use crate::error::ServerError;
+use crate::error::ProxyError;
 use crate::tunnel::agent::AgentTcpConnectionWrite;
 use futures_util::{SinkExt, StreamExt};
 use ppaass_common::crypto::RsaCryptoRepository;
@@ -26,7 +26,7 @@ where
         destination_address: UnifiedAddress,
         keep_alive: bool,
         mut agent_tcp_connection_write: AgentTcpConnectionWrite<R>,
-    ) -> Result<Self, ServerError> {
+    ) -> Result<Self, ProxyError> {
         let destination_tcp_connection =
             DestinationTcpEndpoint::connect(destination_address).await?;
         let tunnel_init_success_response = bincode::serialize(&TunnelInitResponse::Success)?;
@@ -52,7 +52,7 @@ where
 
     pub async fn start_udp(
         agent_tcp_connection_write: AgentTcpConnectionWrite<R>,
-    ) -> Result<Self, ServerError> {
+    ) -> Result<Self, ProxyError> {
         Ok(Self::Udp(DestinationUdpEndpoint::new(
             agent_tcp_connection_write,
         )))

@@ -15,8 +15,6 @@ use std::sync::Arc;
 use tracing::error;
 const USER_AGENT_PUBLIC_KEY: &str = "AgentPublicKey.pem";
 const USER_PROXY_PRIVATE_KEY: &str = "ProxyPrivateKey.pem";
-const FORWARD_AGENT_PRIVATE_KEY: &str = "AgentPrivateKey.pem";
-const FORWARD_PROXY_PUBLIC_KEY: &str = "ProxyPublicKey.pem";
 const DEFAULT_CONFIG_FILE: &str = "resources/config.toml";
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let command = Command::parse();
@@ -24,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .config
         .unwrap_or_else(|| PathBuf::from(DEFAULT_CONFIG_FILE));
     let config_file_content = read_to_string(config_file_path)?;
-    let config = Arc::new(toml::from_str::<ServerConfig>(&config_file_content)?);
+    let config = Arc::new(toml::from_str::<ProxyConfig>(&config_file_content)?);
     let log_dir = command.log_dir.unwrap_or(config.log_dir().clone());
     let _log_guard = init_logger(&log_dir, config.log_name_prefix(), config.max_log_level())?;
     let rsa_dir = command.rsa.unwrap_or(config.rsa_dir().clone());
@@ -35,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     )?);
     let server = Server::new(config, rsa_crypto_repo);
     if let Err(e) = server.run() {
-        error!("Fail to run server: {:?}", e);
+        error!("Fail to run proxy: {:?}", e);
     };
     Ok(())
 }

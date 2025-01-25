@@ -1,4 +1,4 @@
-use crate::error::ServerError;
+use crate::error::ProxyError;
 use crate::tunnel::agent::codec::HandshakeCodec;
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{Sink, StreamExt};
@@ -52,7 +52,7 @@ where
     }
 
     /// Handshake
-    pub async fn handshake(&mut self) -> Result<(), ServerError> {
+    pub async fn handshake(&mut self) -> Result<(), ProxyError> {
         match self {
             AgentTcpConnection::Handshaked { .. } => Ok(()),
             AgentTcpConnection::New {
@@ -60,7 +60,7 @@ where
                 agent_socket_address,
                 rsa_crypto_repo,
             } => {
-                let agent_tcp_stream = agent_tcp_stream.take().ok_or(ServerError::Other(
+                let agent_tcp_stream = agent_tcp_stream.take().ok_or(ProxyError::Other(
                     format!("Fail to get agent tcp stream from object: {agent_socket_address}"),
                 ))?;
                 let mut handshake_framed = Framed::new(agent_tcp_stream, HandshakeCodec);
@@ -70,11 +70,11 @@ where
                 } = handshake_framed
                     .next()
                     .await
-                    .ok_or(ServerError::AgentConnectionExhausted(*agent_socket_address))??;
+                    .ok_or(ProxyError::AgentConnectionExhausted(*agent_socket_address))??;
 
                 let rsa_crypto = rsa_crypto_repo
                     .get_rsa_crypto(&authentication)?
-                    .ok_or(ServerError::RsaCryptoNotFound(authentication.clone()))?;
+                    .ok_or(ProxyError::RsaCryptoNotFound(authentication.clone()))?;
                 let agent_encryption = match encryption {
                     Encryption::Plain => encryption,
                     Encryption::Aes(token) => {
@@ -115,7 +115,7 @@ impl<R> Stream for AgentTcpConnection<R>
 where
     R: RsaCryptoRepository + Sync + Send + 'static,
 {
-    type Item = Result<BytesMut, ServerError>;
+    type Item = Result<BytesMut, ProxyError>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         match self.get_mut() {
             AgentTcpConnection::New { .. } => Poll::Pending,
@@ -152,7 +152,7 @@ impl<R> Sink<BytesMut> for AgentTcpConnection<R>
 where
     R: RsaCryptoRepository + Sync + Send + 'static,
 {
-    type Error = ServerError;
+    type Error = ProxyError;
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         match self.get_mut() {
             AgentTcpConnection::New { .. } => Poll::Pending,
@@ -167,7 +167,7 @@ where
             AgentTcpConnection::New {
                 agent_socket_address,
                 ..
-            } => Err(ServerError::Other(format!(
+            } => Err(ProxyError::Other(format!(
                 "Agent connection still not handshake: {agent_socket_address}"
             ))),
             AgentTcpConnection::Handshaked {

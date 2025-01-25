@@ -2,7 +2,7 @@ use accessory::Accessors;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Accessors)]
-pub struct ServerConfig {
+pub struct ProxyConfig {
     #[access(get)]
     ip_v6: bool,
     #[access(get)]
@@ -18,14 +18,14 @@ pub struct ServerConfig {
     #[access(get)]
     rsa_dir: PathBuf,
 }
-impl Default for ServerConfig {
+impl Default for ProxyConfig {
     fn default() -> Self {
         Self {
             port: 80,
             worker_threads: 32,
             ip_v6: false,
             log_dir: PathBuf::from("log"),
-            log_name_prefix: "ppaass-v3-server".to_string(),
+            log_name_prefix: "ppaass-v3-proxy".to_string(),
             max_log_level: "info".to_string(),
             rsa_dir: PathBuf::from("rsa"),
         }

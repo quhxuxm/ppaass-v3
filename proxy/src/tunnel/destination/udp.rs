@@ -1,4 +1,4 @@
-use crate::error::ServerError;
+use crate::error::ProxyError;
 use crate::tunnel::agent::AgentTcpConnectionWrite;
 use futures_util::SinkExt;
 use ppaass_common::crypto::RsaCryptoRepository;
@@ -32,7 +32,7 @@ where
         data: &[u8],
         source_address: UnifiedAddress,
         destination_address: UnifiedAddress,
-    ) -> Result<(), ServerError> {
+    ) -> Result<(), ProxyError> {
         let destination_socket_addr: Vec<SocketAddr> = destination_address.clone().try_into()?;
         let destination_udp_socket =
             UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0))).await?;

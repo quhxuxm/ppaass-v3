@@ -12,8 +12,8 @@ pub enum Encryption {
     Blowfish(Vec<u8>),
 }
 
-/// The handshake message between agent and server.
-/// When the tcp connection created between agent and server,
+/// The handshake message between agent and proxy.
+/// When the tcp connection created between agent and proxy,
 /// the handshake will happen as the first message used to
 /// communicate the authentication information and exchange
 /// the encryption key.
@@ -30,7 +30,7 @@ pub struct HandshakeRequest {
     pub encryption: Encryption,
 }
 
-/// The handshake response, exchange the server side encryption
+/// The handshake response, exchange the proxy side encryption
 /// to agent
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HandshakeResponse {
