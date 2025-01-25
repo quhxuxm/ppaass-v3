@@ -1,7 +1,7 @@
-use crate::error::ProxyError;
 use crate::tunnel::agent::AgentTcpConnectionWrite;
 use futures_util::SinkExt;
 use ppaass_common::crypto::RsaCryptoRepository;
+use ppaass_common::error::CommonError;
 use ppaass_protocol::{UdpRelayDataResponse, UnifiedAddress};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
@@ -32,12 +32,17 @@ where
         data: &[u8],
         source_address: UnifiedAddress,
         destination_address: UnifiedAddress,
-    ) -> Result<(), ProxyError> {
-        let destination_socket_addr: Vec<SocketAddr> = destination_address.clone().try_into()?;
+    ) -> Result<(), CommonError> {
+        let destination_socks_addrs: Vec<SocketAddr> =
+            destination_address.clone().try_into().map_err(|e| {
+                CommonError::Other(format!(
+                    "Fail to convert destination address to socket address: {e}"
+                ))
+            })?;
         let destination_udp_socket =
             UdpSocket::bind(SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 0))).await?;
         destination_udp_socket
-            .send_to(data, destination_socket_addr.as_slice())
+            .send_to(data, destination_socks_addrs.as_slice())
             .await?;
         let agent_tcp_connection_write = self.agent_tcp_connection_write.clone();
         tokio::spawn(async move {

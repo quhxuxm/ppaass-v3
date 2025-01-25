@@ -1,14 +1,16 @@
 mod command;
 mod config;
 mod error;
-mod server;
+
 mod tunnel;
 use crate::command::Command;
 use clap::Parser;
 pub use config::*;
 use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::init_logger;
-pub use server::*;
+use ppaass_common::server::{CommonServer, Server};
+
+use crate::tunnel::handle_agent_connection;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -16,6 +18,7 @@ use tracing::error;
 const USER_AGENT_PUBLIC_KEY: &str = "AgentPublicKey.pem";
 const USER_PROXY_PRIVATE_KEY: &str = "ProxyPrivateKey.pem";
 const DEFAULT_CONFIG_FILE: &str = "resources/config.toml";
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let command = Command::parse();
     let config_file_path = command
@@ -31,8 +34,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         USER_AGENT_PUBLIC_KEY,
         USER_PROXY_PRIVATE_KEY,
     )?);
-    let server = Server::new(config, rsa_crypto_repo);
-    if let Err(e) = server.run() {
+    let server = CommonServer::new(config, rsa_crypto_repo);
+    if let Err(e) = server.run(handle_agent_connection) {
         error!("Fail to run proxy: {:?}", e);
     };
     Ok(())

@@ -13,3 +13,6 @@ cipher = { workspace = true, features = ["block-padding", "alloc"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["chrono"] }
 tracing-appender = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+bincode = { workspace = true }
+hyper = { workspace = true }

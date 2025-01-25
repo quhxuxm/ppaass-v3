@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use thiserror::Error;
 use tracing::metadata::ParseLevelError;
 #[derive(Error, Debug)]
@@ -11,4 +12,14 @@ pub enum CommonError {
     Rsa(String),
     #[error(transparent)]
     ParseLogLevel(#[from] ParseLevelError),
+    #[error("Can not find rsa crypto with key: {0}")]
+    RsaCryptoNotFound(String),
+    #[error("Connection exhausted: {0}")]
+    ConnectionExhausted(SocketAddr),
+    #[error(transparent)]
+    Bincode(#[from] bincode::Error),
+    #[error(transparent)]
+    Hyper(#[from] hyper::Error),
+    #[error("Other comment error happen: {0}")]
+    Other(String),
 }

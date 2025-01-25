@@ -1,9 +1,9 @@
-use crate::error::ProxyError;
 use crate::tunnel::agent::{AgentTcpConnection, AgentTcpConnectionRead};
 use crate::tunnel::destination::DestinationEdge;
 use crate::ProxyConfig;
 use futures_util::StreamExt;
 use ppaass_common::crypto::RsaCryptoRepository;
+use ppaass_common::error::CommonError;
 use ppaass_protocol::{TunnelInitRequest, UdpRelayDataRequest};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -43,13 +43,13 @@ where
     async fn initialize_tunnel(
         agent_tcp_connection: AgentTcpConnection<T>,
         agent_socket_address: SocketAddr,
-    ) -> Result<(AgentTcpConnectionRead<T>, DestinationEdge<T>), ProxyError> {
+    ) -> Result<(AgentTcpConnectionRead<T>, DestinationEdge<T>), CommonError> {
         let (agent_tcp_connection_write, mut agent_tcp_connection_read) =
             agent_tcp_connection.split();
         let agent_data = agent_tcp_connection_read
             .next()
             .await
-            .ok_or(ProxyError::AgentConnectionExhausted(agent_socket_address))??;
+            .ok_or(CommonError::ConnectionExhausted(agent_socket_address))??;
         let tunnel_init_request: TunnelInitRequest = bincode::deserialize(&agent_data)?;
         match tunnel_init_request {
             TunnelInitRequest::Tcp {
@@ -74,7 +74,7 @@ where
     async fn relay(
         mut agent_tcp_connection_read: AgentTcpConnectionRead<T>,
         destination_edge: DestinationEdge<T>,
-    ) -> Result<(), ProxyError> {
+    ) -> Result<(), CommonError> {
         match destination_edge {
             DestinationEdge::Tcp(destination_tcp_connection_write, destination_read_guard) => {
                 if let Err(e) = agent_tcp_connection_read
@@ -104,10 +104,28 @@ where
         }
         Ok(())
     }
-    pub async fn run(mut self) -> Result<(), ProxyError> {
+    pub async fn run(mut self) -> Result<(), CommonError> {
         self.agent_tcp_connection.handshake().await?;
         let (agent_tcp_connection_read, destination_edge) =
             Self::initialize_tunnel(self.agent_tcp_connection, self.agent_socket_address).await?;
         Self::relay(agent_tcp_connection_read, destination_edge).await
     }
+}
+
+pub async fn handle_agent_connection<R>(
+    config: Arc<ProxyConfig>,
+    rsa_crypto_repo: Arc<R>,
+    agent_tcp_stream: TcpStream,
+    agent_socket_address: SocketAddr,
+) -> Result<(), CommonError>
+where
+    R: RsaCryptoRepository + Send + Sync + 'static,
+{
+    let tunnel = Tunnel::new(
+        config,
+        agent_tcp_stream,
+        agent_socket_address,
+        rsa_crypto_repo,
+    );
+    tunnel.run().await
 }

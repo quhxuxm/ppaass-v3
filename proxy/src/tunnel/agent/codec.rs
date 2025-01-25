@@ -1,4 +1,4 @@
-use crate::error::ProxyError;
+use ppaass_common::error::CommonError;
 use ppaass_protocol::{HandshakeRequest, HandshakeResponse};
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
@@ -16,7 +16,7 @@ impl HandshakeCodec {
 
 impl Decoder for HandshakeCodec {
     type Item = HandshakeRequest;
-    type Error = ProxyError;
+    type Error = CommonError;
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let raw_bytes = self.length_delimited_codec.decode(src)?;
         match raw_bytes {
@@ -30,7 +30,7 @@ impl Decoder for HandshakeCodec {
 }
 
 impl Encoder<HandshakeResponse> for HandshakeCodec {
-    type Error = ProxyError;
+    type Error = CommonError;
     fn encode(&mut self, item: HandshakeResponse, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let raw_bytes = bincode::serialize(&item)?;
         self.length_delimited_codec

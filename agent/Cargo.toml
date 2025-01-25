@@ -6,11 +6,14 @@ edition = "2021"
 [dependencies]
 ppaass-common = { path = "../common", package = "common" }
 ppaass-protocol = { path = "../protocol", package = "protocol" }
-hyper = { workspace = true }
+hyper = { workspace = true, features = ["full"] }
+hyper-util = { workspace = true, features = ["full"] }
 tokio = { workspace = true, features = ["full"] }
 thiserror = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 accessory = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 toml = { workspace = true }
-log = "0.4.25"
+tracing = { workspace = true }
+bincode = { workspace = true }
+http-body-util = { workspace = true }
