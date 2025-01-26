@@ -8,25 +8,25 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tracing::debug;
-pub struct Tunnel<T>
+pub struct Tunnel<R>
 where
-    T: RsaCryptoRepository + Send + Sync + 'static,
+    R: RsaCryptoRepository + Send + Sync + 'static,
 {
     config: Arc<AgentConfig>,
     client_tcp_stream: TcpStream,
     client_socket_address: SocketAddr,
-    rsa_crypto_repo: Arc<T>,
+    rsa_crypto_repo: Arc<R>,
 }
 
-impl<T> Tunnel<T>
+impl<R> Tunnel<R>
 where
-    T: RsaCryptoRepository + Send + Sync + 'static,
+    R: RsaCryptoRepository + Send + Sync + 'static,
 {
     pub fn new(
         config: Arc<AgentConfig>,
         client_tcp_stream: TcpStream,
         client_socket_address: SocketAddr,
-        rsa_crypto_repo: Arc<T>,
+        rsa_crypto_repo: Arc<R>,
     ) -> Self {
         Self {
             config,
@@ -36,7 +36,7 @@ where
         }
     }
 
-    pub async fn run(mut self) -> Result<(), CommonError> {
+    pub async fn run(self) -> Result<(), CommonError> {
         let client_tcp_stream = self.client_tcp_stream;
         let client_socket_addr = self.client_socket_address;
         let mut protocol = [0u8; 1];
@@ -46,16 +46,31 @@ where
         }
         match protocol[0] {
             5 => {
-                debug!("Client connect to agent with socks 5 protocol: {client_socket_addr}");
-                unimplemented!("Socks 5 protocol is not yet implemented");
+                socks5_protocol_proxy(
+                    client_tcp_stream,
+                    self.config,
+                    self.rsa_crypto_repo,
+                    client_socket_addr,
+                )
+                .await
             }
             4 => {
-                debug!("Client connect to agent with socks 4 protocol: {client_socket_addr}");
-                unimplemented!("Socks 4 protocol is not yet implemented");
+                socks4_protocol_proxy(
+                    client_tcp_stream,
+                    self.config,
+                    self.rsa_crypto_repo,
+                    client_socket_addr,
+                )
+                .await
             }
             _ => {
-                let client_http_connection = ClientHttpConnection::new(client_tcp_stream);
-                client_http_connection.exec().await
+                http_protocol_proxy(
+                    client_tcp_stream,
+                    self.config,
+                    self.rsa_crypto_repo,
+                    client_socket_addr,
+                )
+                .await
             }
         }
     }

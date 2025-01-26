@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 ppaass-common = { path = "../common", package = "common" }
-ppaass-protocol = { path = "../protocol", package = "protocol" }
 hyper = { workspace = true, features = ["full"] }
 hyper-util = { workspace = true, features = ["full"] }
 tokio = { workspace = true, features = ["full"] }

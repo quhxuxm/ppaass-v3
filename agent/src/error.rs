@@ -1,5 +1,5 @@
 use ppaass_common::error::CommonError;
-use ppaass_protocol::ProtocolError;
+
 use std::net::SocketAddr;
 use thiserror::Error;
 #[derive(Error, Debug)]
@@ -10,8 +10,6 @@ pub enum AgentError {
     Bincode(#[from] bincode::Error),
     #[error(transparent)]
     Common(#[from] CommonError),
-    #[error(transparent)]
-    Protocol(#[from] ProtocolError),
     #[error("Can not find rsa crypto with key: {0}")]
     RsaCryptoNotFound(String),
     #[error("Agent connection exhausted: {0}")]
