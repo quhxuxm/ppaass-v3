@@ -1,3 +1,6 @@
+use crate::config::AgentConfig;
+use crate::tunnel::resolve_proxy_address;
+use futures_util::{SinkExt, StreamExt};
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::server::conn::http1;
@@ -6,13 +9,14 @@ use hyper::{Method, Request, Response};
 use hyper_util::rt::TokioIo;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
-use ppaass_common::{ProxyTcpConnection, UnifiedAddress};
+use ppaass_common::{
+    ProxyTcpConnection, TunnelInitFailureReason, TunnelInitRequest, TunnelInitResponse,
+    UnifiedAddress,
+};
 use std::net::SocketAddr;
-
-use crate::config::AgentConfig;
-use crate::tunnel::resolve_proxy_address;
 use std::sync::Arc;
 use tokio::net::TcpStream;
+use tokio_util::bytes::BytesMut;
 use tower::ServiceBuilder;
 use tracing::debug;
 async fn client_http_request_handler<R>(
@@ -26,7 +30,7 @@ where
 {
     let destination_uri = client_http_request.uri();
     let destination_host = destination_uri.host().ok_or(CommonError::Other(format!(
-        "Can not find destination host: {destination_uri}"
+        "Can not find destination host: {destination_uri}, client socket address: {client_socket_addr}"
     )))?;
     let destination_port = destination_uri.port().map(|port| port.as_u16());
     let destination_address = if client_http_request.method() == Method::CONNECT {
@@ -40,13 +44,44 @@ where
             port: destination_port.unwrap_or(80),
         }
     };
-    let proxy_tcp_connection = ProxyTcpConnection::create(
+    debug!("Receive client http request to destination: {destination_address:?}, client socket address: {client_socket_addr}");
+    let mut proxy_tcp_connection = ProxyTcpConnection::create(
         config.authentication().to_owned(),
         resolve_proxy_address(config)?.as_slice(),
         rsa_crypto_repo,
     )
     .await?;
-    debug!("Receive client http request to destination: {destination_address:?}");
+    let proxy_socket_address = proxy_tcp_connection.proxy_socket_address();
+    let tunnel_init_request = TunnelInitRequest::Tcp {
+        destination_address: destination_address.clone(),
+        keep_alive: false,
+    };
+    let tunnel_init_request_bytes = bincode::serialize(&tunnel_init_request)?;
+    proxy_tcp_connection
+        .send(BytesMut::from_iter(tunnel_init_request_bytes))
+        .await?;
+    let tunnel_init_response = match proxy_tcp_connection.next().await {
+        None => return Err(CommonError::ConnectionExhausted(proxy_socket_address)),
+        Some(Err(e)) => return Err(e),
+        Some(Ok(tunnel_init_response_bytes)) => bincode::deserialize(&tunnel_init_response_bytes)?,
+    };
+    match tunnel_init_response {
+        TunnelInitResponse::Success => {
+            debug!("Tunnel init success: {destination_address:?}, client socket address: {client_socket_addr}");
+        }
+        TunnelInitResponse::Failure(TunnelInitFailureReason::AuthenticateFail) => {
+            return Err(CommonError::Other(format!(
+                "Tunnel init fail because of authentication: {}, client socket address: {client_socket_addr}",
+                config.authentication()
+            )))
+        }
+        TunnelInitResponse::Failure(TunnelInitFailureReason::InitWithDestinationFail) => {
+            return Err(CommonError::Other(format!(
+                "Tunnel init fail because of destination connect fail: {destination_address}, client socket address: {client_socket_addr}"
+            )))
+        }
+    }
+
     Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
 }
 

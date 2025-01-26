@@ -1,6 +1,7 @@
 use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{Sink, StreamExt};
 use futures_util::{SinkExt, Stream};
+use std::net::SocketAddr;
 
 use crate::connection::codec::{
     HandshakeRequestEncoder, HandshakeResponseDecoder, HandshakeResponseEncoder,
@@ -23,6 +24,7 @@ pub struct ProxyTcpConnection {
     proxy_tcp_framed: Framed<TcpStream, LengthDelimitedCodec>,
     agent_encryption: Arc<Encryption>,
     proxy_encryption: Arc<Encryption>,
+    proxy_socket_address: SocketAddr,
 }
 
 impl ProxyTcpConnection {
@@ -81,12 +83,17 @@ impl ProxyTcpConnection {
             io: proxy_tcp_stream,
             ..
         } = handshake_response_framed.into_parts();
-
+        let proxy_socket_address = proxy_tcp_stream.peer_addr()?;
         Ok(Self {
             proxy_tcp_framed: Framed::new(proxy_tcp_stream, LengthDelimitedCodec::new()),
             agent_encryption: Arc::new(agent_encryption),
             proxy_encryption: Arc::new(proxy_encryption),
+            proxy_socket_address,
         })
+    }
+
+    pub fn proxy_socket_address(&self) -> SocketAddr {
+        self.proxy_socket_address
     }
 }
 
