@@ -5,7 +5,6 @@ edition = "2021"
 
 [dependencies]
 ppaass-common = { path = "../common", package = "common" }
-ppaass-protocol = { path = "../protocol", package = "protocol" }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 thiserror = { workspace = true }

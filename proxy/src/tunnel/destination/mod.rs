@@ -1,32 +1,27 @@
 mod tcp;
 mod udp;
 use crate::error::ProxyError;
-use crate::tunnel::agent::AgentTcpConnectionWrite;
+
 use futures_util::{SinkExt, StreamExt};
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
-use ppaass_protocol::{TunnelInitResponse, UnifiedAddress};
+use ppaass_common::{AgentTcpConnectionWrite, TunnelInitResponse, UnifiedAddress};
+
 pub use tcp::*;
 use tokio::task::JoinHandle;
 use tokio_util::bytes::BytesMut;
 use tracing::error;
 pub use udp::*;
-pub enum DestinationEdge<R>
-where
-    R: RsaCryptoRepository + Send + Sync + 'static,
-{
+pub enum DestinationEdge {
     Tcp(DestinationTcpEndpointWrite, JoinHandle<()>),
-    Udp(DestinationUdpEndpoint<R>),
+    Udp(DestinationUdpEndpoint),
 }
 
-impl<R> DestinationEdge<R>
-where
-    R: RsaCryptoRepository + Send + Sync + 'static,
-{
+impl DestinationEdge {
     pub async fn start_tcp(
         destination_address: UnifiedAddress,
         keep_alive: bool,
-        mut agent_tcp_connection_write: AgentTcpConnectionWrite<R>,
+        mut agent_tcp_connection_write: AgentTcpConnectionWrite,
     ) -> Result<Self, CommonError> {
         let destination_tcp_connection =
             DestinationTcpEndpoint::connect(destination_address).await?;
@@ -52,7 +47,7 @@ where
     }
 
     pub async fn start_udp(
-        agent_tcp_connection_write: AgentTcpConnectionWrite<R>,
+        agent_tcp_connection_write: AgentTcpConnectionWrite,
     ) -> Result<Self, CommonError> {
         Ok(Self::Udp(DestinationUdpEndpoint::new(
             agent_tcp_connection_write,

@@ -18,7 +18,7 @@ impl ClientHttpConnection {
         Self { client_tcp_stream }
     }
 
-    async fn handle_client_http_packet(
+    async fn handle_client_http_request(
         client_http_request: Request<hyper::body::Incoming>,
     ) -> Result<Response<Full<Bytes>>, CommonError> {
         let destination_uri = client_http_request.uri();
@@ -43,7 +43,7 @@ impl ClientHttpConnection {
     pub async fn exec(self) -> Result<(), CommonError> {
         let client_tcp_io = TokioIo::new(self.client_tcp_stream);
         http1::Builder::new()
-            .serve_connection(client_tcp_io, service_fn(Self::handle_client_http_packet))
+            .serve_connection(client_tcp_io, service_fn(Self::handle_client_http_request))
             .await?;
         Ok(())
     }

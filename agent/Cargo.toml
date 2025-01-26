@@ -17,3 +17,5 @@ toml = { workspace = true }
 tracing = { workspace = true }
 bincode = { workspace = true }
 http-body-util = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+futures-util = { workspace = true, features = ["sink"] }

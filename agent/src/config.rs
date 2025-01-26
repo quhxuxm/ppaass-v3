@@ -18,6 +18,10 @@ pub struct AgentConfig {
     max_log_level: String,
     #[access(get)]
     rsa_dir: PathBuf,
+    #[access(get)]
+    proxy_addresses: Vec<String>,
+    #[access(get(ty=&str))]
+    authentication: String,
 }
 
 impl ServerConfig for AgentConfig {

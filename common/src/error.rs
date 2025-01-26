@@ -1,3 +1,4 @@
+use ppaass_protocol::ProtocolError;
 use std::net::SocketAddr;
 use thiserror::Error;
 use tracing::metadata::ParseLevelError;
@@ -18,6 +19,8 @@ pub enum CommonError {
     ConnectionExhausted(SocketAddr),
     #[error(transparent)]
     Bincode(#[from] bincode::Error),
+    #[error(transparent)]
+    Protocol(#[from] ProtocolError),
     #[error(transparent)]
     Hyper(#[from] hyper::Error),
     #[error("Other comment error happen: {0}")]

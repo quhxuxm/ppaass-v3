@@ -1,7 +1,8 @@
 use futures_util::stream::SplitSink;
 use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use ppaass_common::error::CommonError;
-use ppaass_protocol::UnifiedAddress;
+
+use ppaass_common::UnifiedAddress;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::task::{Context, Poll};

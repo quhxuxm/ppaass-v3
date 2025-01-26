@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ppaass-protocol = { package = "protocol", path = "../protocol" }
 uuid = { workspace = true, features = ["v4"] }
 rand = { workspace = true }
 thiserror = { workspace = true }
@@ -16,3 +17,5 @@ tracing-appender = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 bincode = { workspace = true }
 hyper = { workspace = true }
+tokio-util = { workspace = true, features = ["codec"] }
+futures-util = { workspace = true, features = ["sink"] }

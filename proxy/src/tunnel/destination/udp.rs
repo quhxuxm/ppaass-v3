@@ -1,8 +1,8 @@
-use crate::tunnel::agent::AgentTcpConnectionWrite;
 use futures_util::SinkExt;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
-use ppaass_protocol::{UdpRelayDataResponse, UnifiedAddress};
+
+use ppaass_common::{AgentTcpConnectionWrite, UdpRelayDataResponse, UnifiedAddress};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
@@ -10,18 +10,12 @@ use tokio::sync::Mutex;
 use tokio_util::bytes::BytesMut;
 use tracing::error;
 #[derive(Clone)]
-pub struct DestinationUdpEndpoint<R>
-where
-    R: RsaCryptoRepository + Send + Sync + 'static,
-{
-    agent_tcp_connection_write: Arc<Mutex<AgentTcpConnectionWrite<R>>>,
+pub struct DestinationUdpEndpoint {
+    agent_tcp_connection_write: Arc<Mutex<AgentTcpConnectionWrite>>,
 }
 
-impl<R> DestinationUdpEndpoint<R>
-where
-    R: RsaCryptoRepository + Send + Sync + 'static,
-{
-    pub fn new(agent_tcp_connection_write: AgentTcpConnectionWrite<R>) -> Self {
+impl DestinationUdpEndpoint {
+    pub fn new(agent_tcp_connection_write: AgentTcpConnectionWrite) -> Self {
         DestinationUdpEndpoint {
             agent_tcp_connection_write: Arc::new(Mutex::new(agent_tcp_connection_write)),
         }

@@ -1,5 +1,5 @@
 mod client;
-mod proxy;
+
 use crate::config::AgentConfig;
 pub use client::*;
 use ppaass_common::crypto::RsaCryptoRepository;

@@ -1,12 +1,12 @@
-use ppaass_common::error::CommonError;
-use ppaass_protocol::{HandshakeRequest, HandshakeResponse};
+use crate::error::CommonError;
+use ppaass_protocol::HandshakeResponse;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
-pub struct HandshakeCodec {
+pub struct HandshakeResponseDecoder {
     length_delimited_codec: LengthDelimitedCodec,
 }
 
-impl HandshakeCodec {
+impl HandshakeResponseDecoder {
     pub fn new() -> Self {
         Self {
             length_delimited_codec: LengthDelimitedCodec::new(),
@@ -14,22 +14,33 @@ impl HandshakeCodec {
     }
 }
 
-impl Decoder for HandshakeCodec {
-    type Item = HandshakeRequest;
+impl Decoder for HandshakeResponseDecoder {
+    type Item = HandshakeResponse;
     type Error = CommonError;
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         let raw_bytes = self.length_delimited_codec.decode(src)?;
         match raw_bytes {
             None => Ok(None),
             Some(raw_bytes) => {
-                let handshake = bincode::deserialize::<HandshakeRequest>(&raw_bytes)?;
+                let handshake = bincode::deserialize::<HandshakeResponse>(&raw_bytes)?;
                 Ok(Some(handshake))
             }
         }
     }
 }
 
-impl Encoder<HandshakeResponse> for HandshakeCodec {
+pub struct HandshakeResponseEncoder {
+    length_delimited_codec: LengthDelimitedCodec,
+}
+impl HandshakeResponseEncoder {
+    pub fn new() -> Self {
+        Self {
+            length_delimited_codec: LengthDelimitedCodec::new(),
+        }
+    }
+}
+
+impl Encoder<HandshakeResponse> for HandshakeResponseEncoder {
     type Error = CommonError;
     fn encode(&mut self, item: HandshakeResponse, dst: &mut BytesMut) -> Result<(), Self::Error> {
         let raw_bytes = bincode::serialize(&item)?;
