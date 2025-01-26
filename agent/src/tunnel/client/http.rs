@@ -12,6 +12,7 @@ use std::net::SocketAddr;
 use crate::config::AgentConfig;
 use std::sync::Arc;
 use tokio::net::TcpStream;
+use tower::ServiceBuilder;
 use tracing::debug;
 async fn client_http_request_handler(
     client_http_request: Request<hyper::body::Incoming>,
@@ -46,8 +47,9 @@ where
     R: RsaCryptoRepository + Send + Sync + 'static,
 {
     let client_tcp_io = TokioIo::new(client_tcp_stream);
+    let service_fn = ServiceBuilder::new().service(service_fn(client_http_request_handler));
     http1::Builder::new()
-        .serve_connection(client_tcp_io, service_fn(client_http_request_handler))
+        .serve_connection(client_tcp_io, service_fn)
         .await?;
     Ok(())
 }
