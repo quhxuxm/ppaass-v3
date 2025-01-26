@@ -10,13 +10,20 @@ use ppaass_common::{ProxyTcpConnection, UnifiedAddress};
 use std::net::SocketAddr;
 
 use crate::config::AgentConfig;
+use crate::tunnel::resolve_proxy_address;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::debug;
-async fn client_http_request_handler(
+async fn client_http_request_handler<R>(
+    config: &AgentConfig,
+    rsa_crypto_repo: &R,
+    client_socket_addr: SocketAddr,
     client_http_request: Request<hyper::body::Incoming>,
-) -> Result<Response<Full<Bytes>>, CommonError> {
+) -> Result<Response<Full<Bytes>>, CommonError>
+where
+    R: RsaCryptoRepository + Send + Sync + 'static,
+{
     let destination_uri = client_http_request.uri();
     let destination_host = destination_uri.host().ok_or(CommonError::Other(format!(
         "Can not find destination host: {destination_uri}"
@@ -33,6 +40,12 @@ async fn client_http_request_handler(
             port: destination_port.unwrap_or(80),
         }
     };
+    let proxy_tcp_connection = ProxyTcpConnection::create(
+        config.authentication().to_owned(),
+        resolve_proxy_address(config)?.as_slice(),
+        rsa_crypto_repo,
+    )
+    .await?;
     debug!("Receive client http request to destination: {destination_address:?}");
     Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
 }
@@ -47,9 +60,24 @@ where
     R: RsaCryptoRepository + Send + Sync + 'static,
 {
     let client_tcp_io = TokioIo::new(client_tcp_stream);
-    let service_fn = ServiceBuilder::new().service(service_fn(client_http_request_handler));
+    let service_fn = ServiceBuilder::new().service(service_fn(|request| {
+        // let config = config.clone();
+        async {
+            debug!("Begin to handle");
+            client_http_request_handler(
+                config.as_ref(),
+                rsa_crypto_repo.as_ref(),
+                client_socket_addr,
+                request,
+            )
+            .await
+        }
+    }));
     http1::Builder::new()
+        .preserve_header_case(true)
+        .title_case_headers(true)
         .serve_connection(client_tcp_io, service_fn)
+        .with_upgrades()
         .await?;
     Ok(())
 }

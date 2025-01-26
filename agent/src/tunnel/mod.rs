@@ -4,9 +4,21 @@ use crate::config::AgentConfig;
 pub use client::*;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
-use std::net::SocketAddr;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 use tokio::net::TcpStream;
+
+fn resolve_proxy_address(config: &AgentConfig) -> Result<Vec<SocketAddr>, CommonError> {
+    let proxy_addresses = config
+        .proxy_addresses()
+        .iter()
+        .filter_map(|addr| addr.to_socket_addrs().ok())
+        .flatten()
+        .collect::<Vec<SocketAddr>>();
+    Ok(proxy_addresses)
+}
+
+use crate::error::AgentError;
 use tracing::debug;
 pub struct Tunnel<R>
 where
