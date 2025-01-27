@@ -18,8 +18,6 @@ fn resolve_proxy_address(config: &AgentConfig) -> Result<Vec<SocketAddr>, Common
     Ok(proxy_addresses)
 }
 
-use crate::error::AgentError;
-use tracing::debug;
 pub struct Tunnel<R>
 where
     R: RsaCryptoRepository + Send + Sync + 'static,

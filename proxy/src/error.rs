@@ -1,6 +1,5 @@
 use ppaass_common::error::CommonError;
 
-use std::net::SocketAddr;
 use thiserror::Error;
 #[derive(Debug, Error)]
 pub enum ProxyError {

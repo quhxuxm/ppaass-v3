@@ -1,5 +1,5 @@
 use crate::error::CommonError;
-use ppaass_protocol::{HandshakeRequest, HandshakeResponse};
+use ppaass_protocol::HandshakeRequest;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 pub struct HandshakeRequestDecoder {
