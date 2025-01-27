@@ -1,5 +1,5 @@
 [package]
-name = "server"
+name = "proxy"
 version = "0.1.0"
 edition = "2021"
 
@@ -10,7 +10,7 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 accessory = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
-tokio-util = { workspace = true, features = ["codec"] }
+tokio-util = { workspace = true, features = ["codec", "io"] }
 futures-util = { workspace = true, features = ["sink"] }
 bincode = { workspace = true }
 clap = { workspace = true, features = ["derive"] }

@@ -121,7 +121,7 @@ impl Stream for ProxyTcpConnection {
     }
 }
 
-impl Sink<BytesMut> for ProxyTcpConnection {
+impl Sink<&[u8]> for ProxyTcpConnection {
     type Error = CommonError;
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), CommonError>> {
         self.get_mut()
@@ -130,9 +130,9 @@ impl Sink<BytesMut> for ProxyTcpConnection {
             .map_err(Into::into)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: BytesMut) -> Result<(), CommonError> {
+    fn start_send(self: Pin<&mut Self>, item: &[u8]) -> Result<(), CommonError> {
         let item = match self.agent_encryption.as_ref() {
-            Encryption::Plain => item,
+            Encryption::Plain => BytesMut::from(item),
             Encryption::Aes(token) => BytesMut::from_iter(encrypt_with_aes(token, &item)?),
             Encryption::Blowfish(_) => {
                 todo!()

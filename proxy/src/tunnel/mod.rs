@@ -1,16 +1,20 @@
 use crate::tunnel::destination::DestinationEdge;
 use crate::ProxyConfig;
-use futures_util::StreamExt;
+use futures_util::{SinkExt, StreamExt};
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
 
 use ppaass_common::{
-    AgentTcpConnection, AgentTcpConnectionRead, TunnelInitRequest, UdpRelayDataRequest,
+    AgentTcpConnection, TunnelInitRequest, TunnelInitResponse, UdpRelayDataRequest,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::io::copy_bidirectional;
 use tokio::net::TcpStream;
-use tracing::error;
+use tokio::sync::Mutex;
+
+use tokio_util::io::{SinkWriter, StreamReader};
+
 mod destination;
 
 pub struct Tunnel {
@@ -40,12 +44,10 @@ impl Tunnel {
     }
 
     async fn initialize_tunnel(
-        agent_tcp_connection: AgentTcpConnection,
+        agent_tcp_connection: &mut AgentTcpConnection,
         agent_socket_address: SocketAddr,
-    ) -> Result<(AgentTcpConnectionRead, DestinationEdge), CommonError> {
-        let (agent_tcp_connection_write, mut agent_tcp_connection_read) =
-            agent_tcp_connection.split();
-        let agent_data = agent_tcp_connection_read
+    ) -> Result<DestinationEdge, CommonError> {
+        let agent_data = agent_tcp_connection
             .next()
             .await
             .ok_or(CommonError::ConnectionExhausted(agent_socket_address))??;
@@ -54,59 +56,67 @@ impl Tunnel {
             TunnelInitRequest::Tcp {
                 destination_address,
                 keep_alive,
-            } => Ok((
-                agent_tcp_connection_read,
-                DestinationEdge::start_tcp(
-                    destination_address,
-                    keep_alive,
-                    agent_tcp_connection_write,
-                )
-                .await?,
-            )),
-            TunnelInitRequest::Udp => Ok((
-                agent_tcp_connection_read,
-                DestinationEdge::start_udp(agent_tcp_connection_write).await?,
-            )),
+            } => {
+                let destination_edge =
+                    DestinationEdge::start_tcp(destination_address, keep_alive).await?;
+                let tunnel_init_success_response =
+                    bincode::serialize(&TunnelInitResponse::Success)?;
+                agent_tcp_connection
+                    .send(&tunnel_init_success_response)
+                    .await?;
+                Ok(destination_edge)
+            }
+            TunnelInitRequest::Udp => Ok(DestinationEdge::start_udp().await?),
         }
     }
 
     async fn relay(
-        mut agent_tcp_connection_read: AgentTcpConnectionRead,
+        agent_tcp_connection: AgentTcpConnection,
         destination_edge: DestinationEdge,
     ) -> Result<(), CommonError> {
         match destination_edge {
-            DestinationEdge::Tcp(destination_tcp_connection_write, destination_read_guard) => {
-                if let Err(e) = agent_tcp_connection_read
-                    .forward(destination_tcp_connection_write)
-                    .await
-                {
-                    destination_read_guard.abort();
-                    error!("Fail to forward agent tcp connection data to destination tcp connection: {e:?}")
-                };
-            }
-            DestinationEdge::Udp(destination_udp_socket) => loop {
-                let UdpRelayDataRequest {
-                    destination_address,
-                    source_address,
-                    payload,
-                } = match agent_tcp_connection_read.next().await {
-                    None => return Ok(()),
-                    Some(Err(e)) => return Err(e),
-                    Some(Ok(agent_data)) => {
-                        bincode::deserialize::<UdpRelayDataRequest>(&agent_data)?
-                    }
-                };
-                destination_udp_socket
-                    .replay(&payload, source_address, destination_address)
+            DestinationEdge::Tcp(destination_tcp_endpoint) => {
+                let agent_tcp_connection = StreamReader::new(agent_tcp_connection);
+                let mut agent_tcp_connection = SinkWriter::new(agent_tcp_connection);
+                let destination_tcp_endpoint = StreamReader::new(destination_tcp_endpoint);
+                let mut destination_tcp_connection = SinkWriter::new(destination_tcp_endpoint);
+                copy_bidirectional(&mut agent_tcp_connection, &mut destination_tcp_connection)
                     .await?;
-            },
+            }
+            DestinationEdge::Udp(destination_udp_endpoint) => {
+                let agent_tcp_connection = Arc::new(Mutex::new(agent_tcp_connection));
+                loop {
+                    let agent_tcp_connection = agent_tcp_connection.clone();
+                    let UdpRelayDataRequest {
+                        destination_address,
+                        source_address,
+                        payload,
+                    } = match agent_tcp_connection.lock().await.next().await {
+                        None => return Ok(()),
+                        Some(Err(e)) => return Err(e),
+                        Some(Ok(agent_data)) => {
+                            bincode::deserialize::<UdpRelayDataRequest>(&agent_data)?
+                        }
+                    };
+
+                    destination_udp_endpoint
+                        .replay(
+                            agent_tcp_connection,
+                            &payload,
+                            source_address,
+                            destination_address,
+                        )
+                        .await?;
+                }
+            }
         }
         Ok(())
     }
     pub async fn run(mut self) -> Result<(), CommonError> {
-        let (agent_tcp_connection_read, destination_edge) =
-            Self::initialize_tunnel(self.agent_tcp_connection, self.agent_socket_address).await?;
-        Self::relay(agent_tcp_connection_read, destination_edge).await
+        let destination_edge =
+            Self::initialize_tunnel(&mut self.agent_tcp_connection, self.agent_socket_address)
+                .await?;
+        Self::relay(self.agent_tcp_connection, destination_edge).await
     }
 }
 

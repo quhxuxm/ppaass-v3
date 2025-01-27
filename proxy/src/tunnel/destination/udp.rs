@@ -1,28 +1,25 @@
 use futures_util::SinkExt;
-use ppaass_common::crypto::RsaCryptoRepository;
+
 use ppaass_common::error::CommonError;
 
-use ppaass_common::{AgentTcpConnectionWrite, UdpRelayDataResponse, UnifiedAddress};
+use ppaass_common::{AgentTcpConnection, UdpRelayDataResponse, UnifiedAddress};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
-use tokio_util::bytes::BytesMut;
+
 use tracing::error;
 #[derive(Clone)]
-pub struct DestinationUdpEndpoint {
-    agent_tcp_connection_write: Arc<Mutex<AgentTcpConnectionWrite>>,
-}
+pub struct DestinationUdpEndpoint {}
 
 impl DestinationUdpEndpoint {
-    pub fn new(agent_tcp_connection_write: AgentTcpConnectionWrite) -> Self {
-        DestinationUdpEndpoint {
-            agent_tcp_connection_write: Arc::new(Mutex::new(agent_tcp_connection_write)),
-        }
+    pub fn new() -> Self {
+        DestinationUdpEndpoint {}
     }
 
     pub async fn replay(
         &self,
+        agent_tcp_connection: Arc<Mutex<AgentTcpConnection>>,
         data: &[u8],
         source_address: UnifiedAddress,
         destination_address: UnifiedAddress,
@@ -38,7 +35,7 @@ impl DestinationUdpEndpoint {
         destination_udp_socket
             .send_to(data, destination_socks_addrs.as_slice())
             .await?;
-        let agent_tcp_connection_write = self.agent_tcp_connection_write.clone();
+        let agent_tcp_connection = agent_tcp_connection.clone();
         tokio::spawn(async move {
             let mut destination_udp_data = [0u8; 65535];
             let size = match destination_udp_socket.recv(&mut destination_udp_data).await {
@@ -61,9 +58,9 @@ impl DestinationUdpEndpoint {
                     return;
                 }
             };
-            let mut agent_tcp_connection_write = agent_tcp_connection_write.lock().await;
+            let mut agent_tcp_connection_write = agent_tcp_connection.lock().await;
             if let Err(e) = agent_tcp_connection_write
-                .send(BytesMut::from_iter(udp_relay_data_response_bytes))
+                .send(&udp_relay_data_response_bytes)
                 .await
             {
                 error!(

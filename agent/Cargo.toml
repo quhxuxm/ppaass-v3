@@ -17,5 +17,5 @@ tracing = { workspace = true }
 bincode = { workspace = true }
 http-body-util = { workspace = true }
 tower = { workspace = true }
-tokio-util = { workspace = true, features = ["codec"] }
+tokio-util = { workspace = true, features = ["codec", "io", "io-util"] }
 futures-util = { workspace = true, features = ["sink"] }

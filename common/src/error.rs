@@ -26,3 +26,9 @@ pub enum CommonError {
     #[error("Other comment error happen: {0}")]
     Other(String),
 }
+
+impl From<CommonError> for std::io::Error {
+    fn from(value: CommonError) -> Self {
+        std::io::Error::new(std::io::ErrorKind::Other, value)
+    }
+}

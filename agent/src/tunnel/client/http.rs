@@ -1,8 +1,10 @@
 use crate::config::AgentConfig;
 use crate::tunnel::resolve_proxy_address;
 use futures_util::{SinkExt, StreamExt};
-use http_body_util::Full;
-use hyper::body::Bytes;
+use http_body_util::combinators::BoxBody;
+use http_body_util::{BodyExt, Empty, Full};
+use hyper::body::{Bytes, Incoming};
+use hyper::client::conn::http1::Builder;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response};
@@ -13,18 +15,26 @@ use ppaass_common::{
     ProxyTcpConnection, TunnelInitFailureReason, TunnelInitRequest, TunnelInitResponse,
     UnifiedAddress,
 };
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
-use tokio_util::bytes::BytesMut;
+use tokio_util::io::{SinkWriter, StreamReader, SyncIoBridge};
 use tower::ServiceBuilder;
-use tracing::debug;
+use tracing::{debug, error, info};
+
+fn empty_body() -> BoxBody<Bytes, hyper::Error> {
+    Empty::<Bytes>::new()
+        .map_err(|never| match never {})
+        .boxed()
+}
+
 async fn client_http_request_handler<R>(
     config: &AgentConfig,
     rsa_crypto_repo: &R,
     client_socket_addr: SocketAddr,
-    client_http_request: Request<hyper::body::Incoming>,
-) -> Result<Response<Full<Bytes>>, CommonError>
+    client_http_request: Request<Incoming>,
+) -> Result<Response<BoxBody<Bytes, hyper::Error>>, CommonError>
 where
     R: RsaCryptoRepository + Send + Sync + 'static,
 {
@@ -58,7 +68,7 @@ where
     };
     let tunnel_init_request_bytes = bincode::serialize(&tunnel_init_request)?;
     proxy_tcp_connection
-        .send(BytesMut::from_iter(tunnel_init_request_bytes))
+        .send(&tunnel_init_request_bytes)
         .await?;
     let tunnel_init_response = match proxy_tcp_connection.next().await {
         None => return Err(CommonError::ConnectionExhausted(proxy_socket_address)),
@@ -82,7 +92,75 @@ where
         }
     }
 
-    Ok(Response::new(Full::new(Bytes::from("Hello, World!"))))
+    if Method::CONNECT == client_http_request.method() {
+        // Received an HTTP request like:
+        // ```
+        // CONNECT www.domain.com:443 HTTP/1.1
+        // Host: www.domain.com:443
+        // Proxy-Connection: Keep-Alive
+        // ```
+        //
+        // When HTTP method is CONNECT we should return an empty body
+        // then we can eventually upgrade the connection and talk a new protocol.
+        //
+        // Note: only after client received an empty body with STATUS_OK can the
+        // connection be upgraded, so we can't return a response inside
+        // `on_upgrade` future.
+        tokio::task::spawn(async move {
+            match hyper::upgrade::on(client_http_request).await {
+                Err(e) => {
+                    error!("Failed to upgrade client http request: {e}");
+                    return;
+                }
+                Ok(upgraded_client_io) => {
+                    // Connect to remote server
+                    let proxy_tcp_connection = StreamReader::new(proxy_tcp_connection);
+                    let mut proxy_tcp_connection = SinkWriter::new(proxy_tcp_connection);
+                    let mut upgraded_client_io = TokioIo::new(upgraded_client_io);
+
+                    // Proxying data
+                    let (from_client, from_proxy) = match tokio::io::copy_bidirectional(
+                        &mut upgraded_client_io,
+                        &mut proxy_tcp_connection,
+                    )
+                    .await
+                    {
+                        Err(e) => {
+                            error!("Fail to proxy data between agent and proxy: {e:?}");
+                            return;
+                        }
+                        Ok((from_client, from_proxy)) => (from_client, from_proxy),
+                    };
+
+                    // Print message when done
+                    info!(
+                        "Agent wrote {} bytes to proxy, received {} bytes from proxy",
+                        from_client, from_proxy
+                    );
+                }
+            }
+        });
+        Ok(Response::new(empty_body()))
+    } else {
+        let proxy_tcp_connection = StreamReader::new(proxy_tcp_connection);
+        let proxy_tcp_connection = SinkWriter::new(proxy_tcp_connection);
+        let proxy_tcp_connection = TokioIo::new(proxy_tcp_connection);
+        let (mut proxy_tcp_connection_sender, proxy_tcp_connection_obj) = Builder::new()
+            .preserve_header_case(true)
+            .title_case_headers(true)
+            .handshake(proxy_tcp_connection)
+            .await?;
+        tokio::spawn(async move {
+            if let Err(err) = proxy_tcp_connection_obj.await {
+                error!("Proxy tcp connection failed: {:?}", err);
+            }
+        });
+
+        let proxy_response = proxy_tcp_connection_sender
+            .send_request(client_http_request)
+            .await?;
+        Ok(proxy_response.map(|b| b.boxed()))
+    }
 }
 
 pub async fn http_protocol_proxy<R>(
@@ -95,18 +173,14 @@ where
     R: RsaCryptoRepository + Send + Sync + 'static,
 {
     let client_tcp_io = TokioIo::new(client_tcp_stream);
-    let service_fn = ServiceBuilder::new().service(service_fn(|request| {
-        // let config = config.clone();
-        async {
-            debug!("Begin to handle");
-            client_http_request_handler(
-                config.as_ref(),
-                rsa_crypto_repo.as_ref(),
-                client_socket_addr,
-                request,
-            )
-            .await
-        }
+    let service_fn = ServiceBuilder::new().service(service_fn(|request| async {
+        client_http_request_handler(
+            config.as_ref(),
+            rsa_crypto_repo.as_ref(),
+            client_socket_addr,
+            request,
+        )
+        .await
     }));
     http1::Builder::new()
         .preserve_header_case(true)

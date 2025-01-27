@@ -82,6 +82,9 @@ impl AgentTcpConnection {
             proxy_encryption: Arc::new(proxy_encryption),
         })
     }
+    pub fn agent_socket_address(&self) -> SocketAddr {
+        self.agent_socket_address
+    }
 }
 
 impl Stream for AgentTcpConnection {
@@ -108,7 +111,7 @@ impl Stream for AgentTcpConnection {
     }
 }
 
-impl Sink<BytesMut> for AgentTcpConnection {
+impl Sink<&[u8]> for AgentTcpConnection {
     type Error = CommonError;
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.get_mut()
@@ -117,10 +120,10 @@ impl Sink<BytesMut> for AgentTcpConnection {
             .map_err(Into::into)
     }
 
-    fn start_send(self: Pin<&mut Self>, item: BytesMut) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, item: &[u8]) -> Result<(), Self::Error> {
         let item = match self.proxy_encryption.as_ref() {
-            Encryption::Plain => item,
-            Encryption::Aes(token) => BytesMut::from_iter(encrypt_with_aes(token, &item)?),
+            Encryption::Plain => BytesMut::from(item),
+            Encryption::Aes(token) => BytesMut::from_iter(encrypt_with_aes(token, item)?),
             Encryption::Blowfish(_) => {
                 todo!()
             }
