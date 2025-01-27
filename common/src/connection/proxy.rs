@@ -3,9 +3,7 @@ use futures_util::{Sink, StreamExt};
 use futures_util::{SinkExt, Stream};
 use std::net::SocketAddr;
 
-use crate::connection::codec::{
-    HandshakeRequestEncoder, HandshakeResponseDecoder, HandshakeResponseEncoder,
-};
+use crate::connection::codec::{HandshakeRequestEncoder, HandshakeResponseDecoder};
 use crate::crypto::{decrypt_with_aes, encrypt_with_aes, RsaCryptoRepository};
 use crate::error::CommonError;
 use crate::random_32_bytes;
