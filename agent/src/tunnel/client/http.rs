@@ -2,7 +2,7 @@ use crate::config::AgentConfig;
 use crate::tunnel::resolve_proxy_address;
 use futures_util::{SinkExt, StreamExt};
 use http_body_util::combinators::BoxBody;
-use http_body_util::{BodyExt, Empty, Full};
+use http_body_util::{BodyExt, Empty};
 use hyper::body::{Bytes, Incoming};
 use hyper::client::conn::http1::Builder;
 use hyper::server::conn::http1;
@@ -19,7 +19,7 @@ use ppaass_common::{
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
-use tokio_util::io::{SinkWriter, StreamReader, SyncIoBridge};
+use tokio_util::io::{SinkWriter, StreamReader};
 use tower::ServiceBuilder;
 use tracing::{debug, error, info};
 
