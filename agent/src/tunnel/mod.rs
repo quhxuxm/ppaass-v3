@@ -8,6 +8,9 @@ use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tracing::{debug, error};
+
+const SOCKS5_VERSION: u8 = 0x05;
+const SOCKS4_VERSION: u8 = 0x04;
 fn resolve_proxy_address(config: &AgentConfig) -> Result<Vec<SocketAddr>, CommonError> {
     let proxy_addresses = config
         .proxy_addresses()
@@ -36,7 +39,7 @@ where
         return Err(CommonError::ConnectionExhausted(client_socket_addr));
     }
     match protocol[0] {
-        5 => {
+        SOCKS5_VERSION => {
             debug!("Client tcp stream using socks5 protocol: {client_socket_addr}");
             socks5_protocol_proxy(
                 client_tcp_stream,
@@ -46,7 +49,7 @@ where
             )
             .await
         }
-        4 => {
+        SOCKS4_VERSION => {
             debug!("Client tcp stream using socks4 protocol: {client_socket_addr}");
             socks4_protocol_proxy(
                 client_tcp_stream,

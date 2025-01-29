@@ -6,7 +6,7 @@ use ppaass_common::error::CommonError;
 use ppaass_common::{TunnelInitFailureReason, TunnelInitResponse};
 pub use socks4::*;
 pub use socks5::*;
-use tracing::debug;
+
 fn check_proxy_init_tunnel_response(
     tunnel_init_response: TunnelInitResponse,
 ) -> Result<(), CommonError> {

@@ -5,9 +5,9 @@ use std::sync::Arc;
 use tokio::net::TcpStream;
 use tracing::debug;
 pub async fn socks4_protocol_proxy<R>(
-    client_tcp_stream: TcpStream,
-    config: Arc<AgentConfig>,
-    rsa_crypto_repo: Arc<R>,
+    _client_tcp_stream: TcpStream,
+    _config: Arc<AgentConfig>,
+    _rsa_crypto_repo: Arc<R>,
     client_socket_addr: SocketAddr,
 ) -> Result<(), CommonError> {
     debug!("Client connect to agent with socks 4 protocol: {client_socket_addr}");

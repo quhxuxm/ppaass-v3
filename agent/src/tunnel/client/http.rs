@@ -20,7 +20,7 @@ use tokio::net::TcpStream;
 use tokio_util::io::{SinkWriter, StreamReader};
 use tower::ServiceBuilder;
 use tracing::{debug, error, info};
-fn empty_body() -> BoxBody<Bytes, hyper::Error> {
+fn success_empty_body() -> BoxBody<Bytes, hyper::Error> {
     Empty::<Bytes>::new()
         .map_err(|never| match never {})
         .boxed()
@@ -121,7 +121,7 @@ where
                 }
             }
         });
-        Ok(Response::new(empty_body()))
+        Ok(Response::new(success_empty_body()))
     } else {
         let proxy_tcp_connection = StreamReader::new(proxy_tcp_connection);
         let proxy_tcp_connection = SinkWriter::new(proxy_tcp_connection);
