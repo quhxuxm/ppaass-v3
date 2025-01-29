@@ -11,18 +11,15 @@ use hyper::{Method, Request, Response};
 use hyper_util::rt::TokioIo;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
-use ppaass_common::{
-    ProxyTcpConnection, TunnelInitFailureReason, TunnelInitRequest, TunnelInitResponse,
-    UnifiedAddress,
-};
+use ppaass_common::{ProxyTcpConnection, TunnelInitRequest, UnifiedAddress};
 
+use crate::tunnel::client::check_proxy_init_tunnel_response;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio_util::io::{SinkWriter, StreamReader};
 use tower::ServiceBuilder;
 use tracing::{debug, error, info};
-
 fn empty_body() -> BoxBody<Bytes, hyper::Error> {
     Empty::<Bytes>::new()
         .map_err(|never| match never {})
@@ -75,23 +72,7 @@ where
         Some(Err(e)) => return Err(e),
         Some(Ok(tunnel_init_response_bytes)) => bincode::deserialize(&tunnel_init_response_bytes)?,
     };
-    match tunnel_init_response {
-        TunnelInitResponse::Success => {
-            debug!("Tunnel init success: {destination_address:?}, client socket address: {client_socket_addr}");
-        }
-        TunnelInitResponse::Failure(TunnelInitFailureReason::AuthenticateFail) => {
-            return Err(CommonError::Other(format!(
-                "Tunnel init fail because of authentication: {}, client socket address: {client_socket_addr}",
-                config.authentication()
-            )))
-        }
-        TunnelInitResponse::Failure(TunnelInitFailureReason::InitWithDestinationFail) => {
-            return Err(CommonError::Other(format!(
-                "Tunnel init fail because of destination connect fail: {destination_address}, client socket address: {client_socket_addr}"
-            )))
-        }
-    }
-
+    check_proxy_init_tunnel_response(tunnel_init_response)?;
     if Method::CONNECT == client_http_request.method() {
         // Received an HTTP request like:
         // ```

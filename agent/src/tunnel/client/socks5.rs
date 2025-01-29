@@ -1,12 +1,10 @@
 use crate::config::AgentConfig;
+use crate::tunnel::client::check_proxy_init_tunnel_response;
 use crate::tunnel::resolve_proxy_address;
 use futures_util::{SinkExt, StreamExt};
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
-use ppaass_common::{
-    ProxyTcpConnection, TunnelInitFailureReason, TunnelInitRequest, TunnelInitResponse,
-    UnifiedAddress,
-};
+use ppaass_common::{ProxyTcpConnection, TunnelInitRequest, UnifiedAddress};
 use socks5_impl::protocol::handshake::Request as Socks5HandshakeRequest;
 use socks5_impl::protocol::handshake::Response as Socks5HandshakeResponse;
 use socks5_impl::protocol::{Address, AsyncStreamOperation, AuthMethod, Reply};
@@ -71,22 +69,7 @@ where
                     bincode::deserialize(&tunnel_init_response_bytes)?
                 }
             };
-            match tunnel_init_response {
-                TunnelInitResponse::Success => {
-                    debug!("Tunnel init success: {destination_address:?}, client socket address: {client_socket_addr}");
-                }
-                TunnelInitResponse::Failure(TunnelInitFailureReason::AuthenticateFail) => {
-                    return Err(CommonError::Other(format!(
-                        "Tunnel init fail because of authentication: {}, client socket address: {client_socket_addr}",
-                        config.authentication()
-                    )))
-                }
-                TunnelInitResponse::Failure(TunnelInitFailureReason::InitWithDestinationFail) => {
-                    return Err(CommonError::Other(format!(
-                        "Tunnel init fail because of destination connect fail: {destination_address}, client socket address: {client_socket_addr}"
-                    )))
-                }
-            }
+            check_proxy_init_tunnel_response(tunnel_init_response)?;
             debug!("Socks5 client tunnel init success with remote: {proxy_socket_address:?}");
             let init_response = Socks5InitResponse::new(Reply::Succeeded, init_request.address);
             init_response
