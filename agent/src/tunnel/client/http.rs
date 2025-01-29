@@ -1,6 +1,5 @@
 use crate::config::AgentConfig;
 use crate::tunnel::resolve_proxy_address;
-use futures_util::{SinkExt, StreamExt};
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty};
 use hyper::body::{Bytes, Incoming};
@@ -11,9 +10,12 @@ use hyper::{Method, Request, Response};
 use hyper_util::rt::TokioIo;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
-use ppaass_common::{ProxyTcpConnection, TunnelInitRequest, UnifiedAddress};
+use ppaass_common::{ProxyTcpConnection, UnifiedAddress};
 
-use crate::tunnel::client::check_proxy_init_tunnel_response;
+use crate::tunnel::client::{
+    check_proxy_init_tunnel_response, receive_proxy_tunnel_init_response,
+    send_proxy_tunnel_init_request,
+};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
@@ -59,19 +61,14 @@ where
     )
     .await?;
     let proxy_socket_address = proxy_tcp_connection.proxy_socket_address();
-    let tunnel_init_request = TunnelInitRequest::Tcp {
-        destination_address: destination_address.clone(),
-        keep_alive: false,
-    };
-    let tunnel_init_request_bytes = bincode::serialize(&tunnel_init_request)?;
-    proxy_tcp_connection
-        .send(&tunnel_init_request_bytes)
-        .await?;
-    let tunnel_init_response = match proxy_tcp_connection.next().await {
-        None => return Err(CommonError::ConnectionExhausted(proxy_socket_address)),
-        Some(Err(e)) => return Err(e),
-        Some(Ok(tunnel_init_response_bytes)) => bincode::deserialize(&tunnel_init_response_bytes)?,
-    };
+    send_proxy_tunnel_init_request(
+        &mut proxy_tcp_connection,
+        proxy_socket_address,
+        destination_address.clone(),
+    )
+    .await?;
+    let tunnel_init_response =
+        receive_proxy_tunnel_init_response(&mut proxy_tcp_connection, proxy_socket_address).await?;
     check_proxy_init_tunnel_response(tunnel_init_response)?;
     if Method::CONNECT == client_http_request.method() {
         // Received an HTTP request like:

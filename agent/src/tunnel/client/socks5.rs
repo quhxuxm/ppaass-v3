@@ -1,15 +1,17 @@
 use crate::config::AgentConfig;
-use crate::tunnel::client::check_proxy_init_tunnel_response;
+use crate::tunnel::client::{
+    check_proxy_init_tunnel_response, receive_proxy_tunnel_init_response,
+    send_proxy_tunnel_init_request,
+};
 use crate::tunnel::resolve_proxy_address;
-use futures_util::{SinkExt, StreamExt};
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
-use ppaass_common::{ProxyTcpConnection, TunnelInitRequest, UnifiedAddress};
+use ppaass_common::{ProxyTcpConnection, UnifiedAddress};
 use socks5_impl::protocol::handshake::Request as Socks5HandshakeRequest;
 use socks5_impl::protocol::handshake::Response as Socks5HandshakeResponse;
 use socks5_impl::protocol::{Address, AsyncStreamOperation, AuthMethod, Reply};
 use socks5_impl::protocol::{
-    Command, Request as Socks5InitRequest, Response as Socks5InitResponse,
+    Command as Socks5InitCommand, Request as Socks5InitRequest, Response as Socks5InitResponse,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -37,7 +39,7 @@ where
         Socks5InitRequest::retrieve_from_async_stream(&mut client_tcp_stream).await?;
     debug!("Receive client socks5 handshake init request: {init_request:?}");
     match init_request.command {
-        Command::Connect => {
+        Socks5InitCommand::Connect => {
             debug!("Receive socks5 CONNECT command: {client_tcp_stream:?}");
             let mut proxy_tcp_connection = ProxyTcpConnection::create(
                 config.authentication().to_owned(),
@@ -54,21 +56,15 @@ where
                     port: *port,
                 },
             };
-            let tunnel_init_request = TunnelInitRequest::Tcp {
-                destination_address: destination_address.clone(),
-                keep_alive: false,
-            };
-            let tunnel_init_request_bytes = bincode::serialize(&tunnel_init_request)?;
-            proxy_tcp_connection
-                .send(&tunnel_init_request_bytes)
-                .await?;
-            let tunnel_init_response = match proxy_tcp_connection.next().await {
-                None => return Err(CommonError::ConnectionExhausted(proxy_socket_address)),
-                Some(Err(e)) => return Err(e),
-                Some(Ok(tunnel_init_response_bytes)) => {
-                    bincode::deserialize(&tunnel_init_response_bytes)?
-                }
-            };
+            send_proxy_tunnel_init_request(
+                &mut proxy_tcp_connection,
+                proxy_socket_address,
+                destination_address.clone(),
+            )
+            .await?;
+            let tunnel_init_response =
+                receive_proxy_tunnel_init_response(&mut proxy_tcp_connection, proxy_socket_address)
+                    .await?;
             check_proxy_init_tunnel_response(tunnel_init_response)?;
             debug!("Socks5 client tunnel init success with remote: {proxy_socket_address:?}");
             let init_response = Socks5InitResponse::new(Reply::Succeeded, init_request.address);
@@ -98,13 +94,13 @@ where
                 from_client, from_proxy
             );
         }
-        Command::Bind => {
+        Socks5InitCommand::Bind => {
             debug!("Receive socks5 BIND command: {client_tcp_stream:?}");
             return Err(CommonError::Other(format!(
                 "Unsupported socks5 bind command: {client_socket_addr}"
             )));
         }
-        Command::UdpAssociate => {
+        Socks5InitCommand::UdpAssociate => {
             debug!("Receive socks5 UDP ASSOCIATE command: {client_tcp_stream:?}");
             return Err(CommonError::Other(format!(
                 "Unsupported socks5 udp associate command: {client_socket_addr}"
