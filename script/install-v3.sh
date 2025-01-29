@@ -47,8 +47,8 @@ cargo build --release --package proxy
 
 # ps -ef | grep gradle | grep -v grep | awk '{print $2}' | xargs kill -9
 sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/* /ppaass-v3/build/resources
-sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/rsa/* /ppaass-v3/build/resources/rsa
-sudo cp /ppaass-v3/sourcecode/ppaass-v3/core/target/release/proxy /ppaass-v3/build/ppaass-v3-proxy
+sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/agent_rsa/* /ppaass-v3/build/resources/agent_rsa
+sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/proxy /ppaass-v3/build/ppaass-v3-proxy
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/script/start-proxy.sh /ppaass-v3/build/
 
 sudo chmod 777 /ppaass-v3/build
