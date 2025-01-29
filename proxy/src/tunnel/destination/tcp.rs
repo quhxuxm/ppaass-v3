@@ -18,7 +18,7 @@ pub struct DestinationTcpEndpoint {
 impl DestinationTcpEndpoint {
     pub async fn connect(
         destination_address: UnifiedAddress,
-        keep_alive: bool,
+        _keep_alive: bool,
     ) -> Result<Self, CommonError> {
         let destination_socks_addrs: Vec<SocketAddr> =
             destination_address.clone().try_into().map_err(|e| {

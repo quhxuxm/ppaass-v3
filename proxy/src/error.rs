@@ -7,6 +7,4 @@ pub enum ProxyError {
     Io(#[from] std::io::Error),
     #[error(transparent)]
     Common(#[from] CommonError),
-    #[error("Other error: {0}")]
-    Other(String),
 }

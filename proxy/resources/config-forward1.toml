@@ -3,5 +3,5 @@ server_port = 10091
 worker_thread_number = 64
 log_dir = "log"
 log_name_prefix = "ppaass-server-v3"
-max_log_level = "trace"
+max_log_level = "info"
 agent_rsa_dir = "resources/agent_rsa"

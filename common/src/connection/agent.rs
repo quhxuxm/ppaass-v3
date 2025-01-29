@@ -92,6 +92,7 @@ impl Stream for AgentTcpConnection {
     type Item = Result<BytesMut, CommonError>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let agent_encryption = self.agent_encryption.clone();
+        let authentication = self.authentication.clone();
         let agent_data = ready!(self.get_mut().agent_tcp_framed.poll_next_unpin(cx));
         match agent_data {
             None => Poll::Ready(None),
@@ -102,7 +103,7 @@ impl Stream for AgentTcpConnection {
                     Encryption::Aes(token) => match decrypt_with_aes(&token, &agent_data) {
                         Ok(raw_data) => {
                             trace!(
-                                "Agent tcp connection receive data:\n{}",
+                                "Agent tcp connection from [{authentication}] receive data:\n{}",
                                 pretty_hex::pretty_hex(&raw_data)
                             );
                             Poll::Ready(Some(Ok(BytesMut::from_iter(raw_data))))
@@ -128,11 +129,12 @@ impl Sink<&[u8]> for AgentTcpConnection {
     }
 
     fn start_send(self: Pin<&mut Self>, item: &[u8]) -> Result<(), Self::Error> {
+        let authentication = self.authentication.clone();
         let item = match self.proxy_encryption.as_ref() {
             Encryption::Plain => BytesMut::from(item),
             Encryption::Aes(token) => {
                 trace!(
-                    "Agent tcp connection send data:\n{}",
+                    "Agent tcp connection from [{authentication}] send data:\n{}",
                     pretty_hex::pretty_hex(&item)
                 );
                 BytesMut::from_iter(encrypt_with_aes(token, item)?)
