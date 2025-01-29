@@ -7,7 +7,7 @@ use ppaass_common::error::CommonError;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::Arc;
 use tokio::net::TcpStream;
-
+use tracing::{debug, error};
 fn resolve_proxy_address(config: &AgentConfig) -> Result<Vec<SocketAddr>, CommonError> {
     let proxy_addresses = config
         .proxy_addresses()
@@ -16,74 +16,6 @@ fn resolve_proxy_address(config: &AgentConfig) -> Result<Vec<SocketAddr>, Common
         .flatten()
         .collect::<Vec<SocketAddr>>();
     Ok(proxy_addresses)
-}
-
-pub struct Tunnel<R>
-where
-    R: RsaCryptoRepository + Send + Sync + 'static,
-{
-    config: Arc<AgentConfig>,
-    client_tcp_stream: TcpStream,
-    client_socket_address: SocketAddr,
-    rsa_crypto_repo: Arc<R>,
-}
-
-impl<R> Tunnel<R>
-where
-    R: RsaCryptoRepository + Send + Sync + 'static,
-{
-    pub fn new(
-        config: Arc<AgentConfig>,
-        client_tcp_stream: TcpStream,
-        client_socket_address: SocketAddr,
-        rsa_crypto_repo: Arc<R>,
-    ) -> Self {
-        Self {
-            config,
-            client_tcp_stream,
-            client_socket_address,
-            rsa_crypto_repo,
-        }
-    }
-
-    pub async fn run(self) -> Result<(), CommonError> {
-        let client_tcp_stream = self.client_tcp_stream;
-        let client_socket_addr = self.client_socket_address;
-        let mut protocol = [0u8; 1];
-        let peek_size = client_tcp_stream.peek(&mut protocol).await?;
-        if peek_size == 0 {
-            return Err(CommonError::ConnectionExhausted(client_socket_addr));
-        }
-        match protocol[0] {
-            5 => {
-                socks5_protocol_proxy(
-                    client_tcp_stream,
-                    self.config,
-                    self.rsa_crypto_repo,
-                    client_socket_addr,
-                )
-                .await
-            }
-            4 => {
-                socks4_protocol_proxy(
-                    client_tcp_stream,
-                    self.config,
-                    self.rsa_crypto_repo,
-                    client_socket_addr,
-                )
-                .await
-            }
-            _ => {
-                http_protocol_proxy(
-                    client_tcp_stream,
-                    self.config,
-                    self.rsa_crypto_repo,
-                    client_socket_addr,
-                )
-                .await
-            }
-        }
-    }
 }
 
 pub async fn handle_client_connection<R>(
@@ -95,11 +27,44 @@ pub async fn handle_client_connection<R>(
 where
     R: RsaCryptoRepository + Send + Sync + 'static,
 {
-    let tunnel = Tunnel::new(
-        config,
-        client_tcp_stream,
-        client_socket_address,
-        rsa_crypto_repo,
-    );
-    tunnel.run().await
+    let client_tcp_stream = client_tcp_stream;
+    let client_socket_addr = client_socket_address;
+    let mut protocol = [0u8; 1];
+    let peek_size = client_tcp_stream.peek(&mut protocol).await?;
+    if peek_size == 0 {
+        error!("Client tcp stream exhausted: {client_socket_addr}");
+        return Err(CommonError::ConnectionExhausted(client_socket_addr));
+    }
+    match protocol[0] {
+        5 => {
+            debug!("Client tcp stream using socks5 protocol: {client_socket_addr}");
+            socks5_protocol_proxy(
+                client_tcp_stream,
+                config,
+                rsa_crypto_repo,
+                client_socket_addr,
+            )
+            .await
+        }
+        4 => {
+            debug!("Client tcp stream using socks4 protocol: {client_socket_addr}");
+            socks4_protocol_proxy(
+                client_tcp_stream,
+                config,
+                rsa_crypto_repo,
+                client_socket_addr,
+            )
+            .await
+        }
+        _ => {
+            debug!("Client tcp stream using http protocol: {client_socket_addr}");
+            http_protocol_proxy(
+                client_tcp_stream,
+                config,
+                rsa_crypto_repo,
+                client_socket_addr,
+            )
+            .await
+        }
+    }
 }

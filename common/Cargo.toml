@@ -7,9 +7,10 @@ edition = "2021"
 ppaass-protocol = { package = "protocol", path = "../protocol" }
 uuid = { workspace = true, features = ["v4"] }
 rand = { workspace = true }
+rand_core = { workspace = true }
 thiserror = { workspace = true }
 aes = { workspace = true }
-rsa = { workspace = true }
+rsa = { workspace = true, features = ["getrandom"] }
 cipher = { workspace = true, features = ["block-padding", "alloc"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["chrono"] }
@@ -19,4 +20,3 @@ bincode = { workspace = true }
 hyper = { workspace = true }
 tokio-util = { workspace = true, features = ["codec"] }
 futures-util = { workspace = true, features = ["sink"] }
-bytes = "1.9.0"

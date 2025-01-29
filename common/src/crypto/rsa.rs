@@ -1,5 +1,5 @@
 use crate::error::CommonError;
-use rand::rngs::OsRng;
+use rsa::rand_core::OsRng;
 use rsa::{
     pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey, LineEnding},
     Pkcs1v15Encrypt,

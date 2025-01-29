@@ -23,7 +23,7 @@ where
     fn run<F, Fut>(&self, connection_handler: F) -> Result<(), CommonError>
     where
         F: Fn(Arc<C>, Arc<R>, TcpStream, SocketAddr) -> Fut + Send + Sync + Clone + 'static,
-        Fut: Future<Output = Result<(), CommonError>> + Send + Sync + 'static,
+        Fut: Future<Output = Result<(), CommonError>> + Send + 'static,
     {
         let runtime = Builder::new_multi_thread()
             .enable_all()
