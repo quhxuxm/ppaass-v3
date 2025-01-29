@@ -16,8 +16,7 @@ use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use crate::error::ProxyError;
-use tracing::{debug, error, info, trace};
+use tracing::{debug, error, trace};
 const USER_AGENT_PUBLIC_KEY: &str = "AgentPublicKey.pem";
 const USER_PROXY_PRIVATE_KEY: &str = "ProxyPrivateKey.pem";
 
