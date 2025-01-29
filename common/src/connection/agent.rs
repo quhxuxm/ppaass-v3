@@ -13,6 +13,7 @@ use std::task::{ready, Context, Poll};
 use tokio::net::TcpStream;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Framed, FramedParts, LengthDelimitedCodec};
+use tracing::trace;
 pub type AgentTcpConnectionWrite = SplitSink<AgentTcpConnection, BytesMut>;
 pub type AgentTcpConnectionRead = SplitStream<AgentTcpConnection>;
 pub struct AgentTcpConnection {
@@ -99,7 +100,13 @@ impl Stream for AgentTcpConnection {
                 Ok(agent_data) => match agent_encryption.as_ref() {
                     Encryption::Plain => Poll::Ready(Some(Ok(agent_data))),
                     Encryption::Aes(token) => match decrypt_with_aes(&token, &agent_data) {
-                        Ok(raw_data) => Poll::Ready(Some(Ok(BytesMut::from_iter(raw_data)))),
+                        Ok(raw_data) => {
+                            trace!(
+                                "Agent tcp connection receive data:\n{}",
+                                pretty_hex::pretty_hex(&raw_data)
+                            );
+                            Poll::Ready(Some(Ok(BytesMut::from_iter(raw_data))))
+                        }
                         Err(e) => Poll::Ready(Some(Err(e.into()))),
                     },
                     Encryption::Blowfish(_) => {
@@ -123,7 +130,13 @@ impl Sink<&[u8]> for AgentTcpConnection {
     fn start_send(self: Pin<&mut Self>, item: &[u8]) -> Result<(), Self::Error> {
         let item = match self.proxy_encryption.as_ref() {
             Encryption::Plain => BytesMut::from(item),
-            Encryption::Aes(token) => BytesMut::from_iter(encrypt_with_aes(token, item)?),
+            Encryption::Aes(token) => {
+                trace!(
+                    "Agent tcp connection send data:\n{}",
+                    pretty_hex::pretty_hex(&item)
+                );
+                BytesMut::from_iter(encrypt_with_aes(token, item)?)
+            }
             Encryption::Blowfish(_) => {
                 todo!()
             }

@@ -4,22 +4,13 @@ use crate::config::AgentConfig;
 pub use client::*;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
-use std::net::{SocketAddr, ToSocketAddrs};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tracing::{debug, error};
 
 const SOCKS5_VERSION: u8 = 0x05;
 const SOCKS4_VERSION: u8 = 0x04;
-fn resolve_proxy_address(config: &AgentConfig) -> Result<Vec<SocketAddr>, CommonError> {
-    let proxy_addresses = config
-        .proxy_addresses()
-        .iter()
-        .filter_map(|addr| addr.to_socket_addrs().ok())
-        .flatten()
-        .collect::<Vec<SocketAddr>>();
-    Ok(proxy_addresses)
-}
 
 pub async fn handle_client_connection<R>(
     config: Arc<AgentConfig>,

@@ -28,11 +28,12 @@ impl RsaCrypto {
         let mut public_key_string = String::new();
         public_key_read.read_to_string(&mut public_key_string)?;
         let public_key = RsaPublicKey::from_public_key_pem(&public_key_string)
-            .map_err(|e| CommonError::Rsa(format!("Fail to create rsa public key: {e:?}")))?;
+            .map_err(|e| CommonError::Rsa(format!("Fail to create agent_rsa public key: {e:?}")))?;
         let mut private_key_string = String::new();
         private_key_read.read_to_string(&mut private_key_string)?;
-        let private_key = RsaPrivateKey::from_pkcs8_pem(&private_key_string)
-            .map_err(|e| CommonError::Rsa(format!("Fail to create rsa private key: {e:?}")))?;
+        let private_key = RsaPrivateKey::from_pkcs8_pem(&private_key_string).map_err(|e| {
+            CommonError::Rsa(format!("Fail to create agent_rsa private key: {e:?}"))
+        })?;
         Ok(Self {
             public_key,
             private_key,
@@ -44,7 +45,7 @@ impl RsaCrypto {
         let result = self
             .public_key
             .encrypt(&mut OsRng, Pkcs1v15Encrypt, target.as_ref())
-            .map_err(|e| CommonError::Rsa(format!("Fail to encrypt with rsa: {e:?}")))?;
+            .map_err(|e| CommonError::Rsa(format!("Fail to encrypt with agent_rsa: {e:?}")))?;
         Ok(result)
     }
 
@@ -53,7 +54,7 @@ impl RsaCrypto {
         let result = self
             .private_key
             .decrypt(Pkcs1v15Encrypt, target.as_ref())
-            .map_err(|e| CommonError::Rsa(format!("Fail to decrypt with rsa: {e:?}")))?;
+            .map_err(|e| CommonError::Rsa(format!("Fail to decrypt with agent_rsa: {e:?}")))?;
         Ok(result)
     }
 }

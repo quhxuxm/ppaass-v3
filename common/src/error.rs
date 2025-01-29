@@ -13,7 +13,7 @@ pub enum CommonError {
     Rsa(String),
     #[error(transparent)]
     ParseLogLevel(#[from] ParseLevelError),
-    #[error("Can not find rsa crypto with key: {0}")]
+    #[error("Can not find agent_rsa crypto with key: {0}")]
     RsaCryptoNotFound(String),
     #[error("Connection exhausted: {0}")]
     ConnectionExhausted(SocketAddr),

@@ -1,5 +1,4 @@
 use crate::config::AgentConfig;
-use crate::tunnel::resolve_proxy_address;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty};
 use hyper::body::{Bytes, Incoming};
@@ -10,12 +9,12 @@ use hyper::{Method, Request, Response};
 use hyper_util::rt::TokioIo;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
-use ppaass_common::{ProxyTcpConnection, UnifiedAddress};
-
-use crate::tunnel::client::{
-    check_proxy_init_tunnel_response, receive_proxy_tunnel_init_response,
-    send_proxy_tunnel_init_request,
+use ppaass_common::{
+    check_proxy_init_tunnel_response, parse_to_socket_addresses,
+    receive_proxy_tunnel_init_response, send_proxy_tunnel_init_request, ProxyTcpConnection,
+    UnifiedAddress,
 };
+
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
@@ -56,7 +55,7 @@ where
     debug!("Receive client http request to destination: {destination_address:?}, client socket address: {client_socket_addr}");
     let mut proxy_tcp_connection = ProxyTcpConnection::create(
         config.authentication().to_owned(),
-        resolve_proxy_address(config)?.as_slice(),
+        parse_to_socket_addresses(config.proxy_addresses())?.as_slice(),
         rsa_crypto_repo,
     )
     .await?;

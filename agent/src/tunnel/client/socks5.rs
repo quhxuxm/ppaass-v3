@@ -1,12 +1,12 @@
 use crate::config::AgentConfig;
-use crate::tunnel::client::{
-    check_proxy_init_tunnel_response, receive_proxy_tunnel_init_response,
-    send_proxy_tunnel_init_request,
-};
-use crate::tunnel::resolve_proxy_address;
+
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
-use ppaass_common::{ProxyTcpConnection, UnifiedAddress};
+use ppaass_common::{
+    check_proxy_init_tunnel_response, parse_to_socket_addresses,
+    receive_proxy_tunnel_init_response, send_proxy_tunnel_init_request, ProxyTcpConnection,
+    UnifiedAddress,
+};
 use socks5_impl::protocol::handshake::Request as Socks5HandshakeRequest;
 use socks5_impl::protocol::handshake::Response as Socks5HandshakeResponse;
 use socks5_impl::protocol::{Address, AsyncStreamOperation, AuthMethod, Reply};
@@ -43,7 +43,7 @@ where
             debug!("Receive socks5 CONNECT command: {client_tcp_stream:?}");
             let mut proxy_tcp_connection = ProxyTcpConnection::create(
                 config.authentication().to_owned(),
-                resolve_proxy_address(&config)?.as_slice(),
+                parse_to_socket_addresses(config.proxy_addresses())?.as_slice(),
                 rsa_crypto_repo.as_ref(),
             )
             .await?;

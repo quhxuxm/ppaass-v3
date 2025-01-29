@@ -10,7 +10,7 @@ pub enum AgentError {
     Bincode(#[from] bincode::Error),
     #[error(transparent)]
     Common(#[from] CommonError),
-    #[error("Can not find rsa crypto with key: {0}")]
+    #[error("Can not find agent_rsa crypto with key: {0}")]
     RsaCryptoNotFound(String),
     #[error("Agent connection exhausted: {0}")]
     AgentConnectionExhausted(SocketAddr),

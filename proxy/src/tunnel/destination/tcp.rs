@@ -12,6 +12,7 @@ use tracing::debug;
 
 pub struct DestinationTcpEndpoint {
     destination_tcp_framed: Framed<TcpStream, BytesCodec>,
+    destination_address: UnifiedAddress,
 }
 
 impl DestinationTcpEndpoint {
@@ -30,7 +31,12 @@ impl DestinationTcpEndpoint {
         debug!("Connected to destination success: {}", destination_address);
         Ok(DestinationTcpEndpoint {
             destination_tcp_framed: Framed::new(destination_tcp_stream, BytesCodec::new()),
+            destination_address,
         })
+    }
+
+    pub fn destination_address(&self) -> &UnifiedAddress {
+        &self.destination_address
     }
 }
 

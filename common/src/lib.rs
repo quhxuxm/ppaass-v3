@@ -1,3 +1,4 @@
+use futures_util::StreamExt;
 pub mod config;
 mod connection;
 pub mod crypto;
@@ -5,11 +6,13 @@ pub mod error;
 pub mod server;
 use crate::error::CommonError;
 pub use connection::*;
+use futures_util::SinkExt;
 pub use ppaass_protocol::*;
 use rand::random;
+use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::Path;
 use std::str::FromStr;
-use tracing::Level;
+use tracing::{debug, Level};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::fmt::time::ChronoUtc;
 use uuid::Uuid;
@@ -47,4 +50,63 @@ pub fn init_logger(
         .with_ansi(false)
         .init();
     Ok(_trace_appender_guard)
+}
+
+pub fn parse_to_socket_addresses<I, T>(addresses: I) -> Result<Vec<SocketAddr>, CommonError>
+where
+    I: IntoIterator<Item = T>,
+    T: AsRef<str>,
+{
+    let proxy_addresses = addresses
+        .into_iter()
+        .filter_map(|addr| addr.as_ref().to_socket_addrs().ok())
+        .flatten()
+        .collect::<Vec<SocketAddr>>();
+    Ok(proxy_addresses)
+}
+
+pub async fn send_proxy_tunnel_init_request(
+    proxy_tcp_connection: &mut ProxyTcpConnection,
+    proxy_socket_address: SocketAddr,
+    destination_address: UnifiedAddress,
+) -> Result<(), CommonError> {
+    let tunnel_init_request = TunnelInitRequest::Tcp {
+        destination_address,
+        keep_alive: false,
+    };
+    let tunnel_init_request_bytes = bincode::serialize(&tunnel_init_request)?;
+    proxy_tcp_connection
+        .send(&tunnel_init_request_bytes)
+        .await?;
+    debug!("Success to send tunnel init request to proxy: {proxy_socket_address}");
+    Ok(())
+}
+pub async fn receive_proxy_tunnel_init_response(
+    proxy_tcp_connection: &mut ProxyTcpConnection,
+    proxy_socket_address: SocketAddr,
+) -> Result<TunnelInitResponse, CommonError> {
+    match proxy_tcp_connection.next().await {
+        None => Err(CommonError::ConnectionExhausted(proxy_socket_address)),
+        Some(Err(e)) => Err(e),
+        Some(Ok(tunnel_init_response_bytes)) => {
+            Ok(bincode::deserialize(&tunnel_init_response_bytes)?)
+        }
+    }
+}
+pub fn check_proxy_init_tunnel_response(
+    tunnel_init_response: TunnelInitResponse,
+) -> Result<(), CommonError> {
+    match tunnel_init_response {
+        TunnelInitResponse::Success => Ok(()),
+        TunnelInitResponse::Failure(TunnelInitFailureReason::AuthenticateFail) => {
+            Err(CommonError::Other(format!(
+                "Tunnel init fail on authenticate: {tunnel_init_response:?}",
+            )))
+        }
+        TunnelInitResponse::Failure(TunnelInitFailureReason::InitWithDestinationFail) => {
+            Err(CommonError::Other(format!(
+                "Tunnel init fail on connect destination: {tunnel_init_response:?}",
+            )))
+        }
+    }
 }

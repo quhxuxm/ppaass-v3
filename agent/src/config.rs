@@ -2,10 +2,6 @@ use accessory::Accessors;
 use ppaass_common::config::ServerConfig;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-pub enum AgentProtocol {
-    Http,
-    Socks,
-}
 #[derive(Serialize, Deserialize, Debug, Accessors)]
 pub struct AgentConfig {
     #[access(get)]

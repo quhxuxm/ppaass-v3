@@ -17,7 +17,19 @@ pub struct ProxyConfig {
     #[access(get(ty=&str))]
     max_log_level: String,
     #[access(get)]
-    rsa_dir: PathBuf,
+    agent_rsa_dir: PathBuf,
+    #[access(get)]
+    forward_proxies: Option<Vec<ForwardProxyInfo>>,
+    #[access(get)]
+    forward_rsa_dir: Option<PathBuf>,
+}
+
+#[derive(Serialize, Deserialize, Accessors)]
+pub struct ForwardProxyInfo {
+    #[access(get(ty=&str))]
+    pub proxy_address: String,
+    #[access(get(ty=&str))]
+    pub proxy_auth: String,
 }
 
 impl ServerConfig for ProxyConfig {
@@ -40,7 +52,9 @@ impl Default for ProxyConfig {
             log_dir: PathBuf::from("log"),
             log_name_prefix: "ppaass-v3-proxy".to_string(),
             max_log_level: "info".to_string(),
-            rsa_dir: PathBuf::from("rsa"),
+            agent_rsa_dir: PathBuf::from("agent_rsa"),
+            forward_rsa_dir: None,
+            forward_proxies: None,
         }
     }
 }

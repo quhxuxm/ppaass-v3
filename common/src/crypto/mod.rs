@@ -12,6 +12,7 @@ pub trait RsaCryptoRepository {
     fn get_rsa_crypto(&self, key: &str) -> Result<Option<Arc<RsaCrypto>>, CommonError>;
 }
 
+#[derive(Debug)]
 pub struct FileSystemRsaCryptoRepo {
     cache: Arc<HashMap<String, Arc<RsaCrypto>>>,
 }
@@ -50,7 +51,7 @@ impl FileSystemRsaCryptoRepo {
                 return;
             };
             let Ok(rsa_crypto) = RsaCrypto::new(public_key_file, private_key_file) else {
-                error!("Fail to create rsa crypto for user: {user_token}.");
+                error!("Fail to create agent_rsa crypto for user: {user_token}.");
                 return;
             };
             cache.insert(user_token.to_string(), Arc::new(rsa_crypto));

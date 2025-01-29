@@ -5,7 +5,9 @@ use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
 
 use ppaass_common::{
-    AgentTcpConnection, TunnelInitRequest, TunnelInitResponse, UdpRelayDataRequest,
+    check_proxy_init_tunnel_response, parse_to_socket_addresses,
+    receive_proxy_tunnel_init_response, send_proxy_tunnel_init_request, AgentTcpConnection,
+    ProxyTcpConnection, TunnelInitRequest, TunnelInitResponse, UdpRelayDataRequest,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -13,22 +15,31 @@ use tokio::io::copy_bidirectional;
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
+use rand::random;
 use tokio_util::io::{SinkWriter, StreamReader};
-
+use tracing::debug;
 mod destination;
 
-pub struct Tunnel {
+pub struct Tunnel<'a, T>
+where
+    T: RsaCryptoRepository + Send + Sync + 'static,
+{
     config: Arc<ProxyConfig>,
     agent_tcp_connection: AgentTcpConnection,
     agent_socket_address: SocketAddr,
+    forward_rsa_crypto_repo: Option<&'a T>,
 }
 
-impl Tunnel {
-    pub async fn new<T>(
+impl<'a, T> Tunnel<'a, T>
+where
+    T: RsaCryptoRepository + Send + Sync + 'static,
+{
+    pub async fn new(
         config: Arc<ProxyConfig>,
         agent_tcp_stream: TcpStream,
         agent_socket_address: SocketAddr,
-        rsa_crypto_repo: &T,
+        rsa_crypto_repo: &'a T,
+        forward_rsa_crypto_repo: Option<&'a T>,
     ) -> Result<Self, CommonError>
     where
         T: RsaCryptoRepository + Send + Sync + 'static,
@@ -40,12 +51,15 @@ impl Tunnel {
             config,
             agent_tcp_connection,
             agent_socket_address,
+            forward_rsa_crypto_repo,
         })
     }
 
     async fn initialize_tunnel(
         agent_tcp_connection: &mut AgentTcpConnection,
         agent_socket_address: SocketAddr,
+        config: &ProxyConfig,
+        forward_rsa_crypto_repo: Option<&T>,
     ) -> Result<DestinationEdge, CommonError> {
         let agent_data = agent_tcp_connection
             .next()
@@ -56,16 +70,34 @@ impl Tunnel {
             TunnelInitRequest::Tcp {
                 destination_address,
                 keep_alive,
-            } => {
-                let destination_edge =
-                    DestinationEdge::start_tcp(destination_address, keep_alive).await?;
-                let tunnel_init_success_response =
-                    bincode::serialize(&TunnelInitResponse::Success)?;
-                agent_tcp_connection
-                    .send(&tunnel_init_success_response)
+            } => match config.forward_proxies() {
+                None => {
+                    let destination_edge =
+                        DestinationEdge::start_tcp(destination_address, keep_alive).await?;
+                    let tunnel_init_success_response =
+                        bincode::serialize(&TunnelInitResponse::Success)?;
+                    agent_tcp_connection
+                        .send(&tunnel_init_success_response)
+                        .await?;
+                    Ok(destination_edge)
+                }
+                Some(forward_proxies) => {
+                    let destination_edge = DestinationEdge::start_forward(
+                        forward_proxies,
+                        forward_rsa_crypto_repo.ok_or(CommonError::Other(
+                            "Forward rsa crypto repo not exist".to_string(),
+                        ))?,
+                        destination_address,
+                    )
                     .await?;
-                Ok(destination_edge)
-            }
+                    let tunnel_init_success_response =
+                        bincode::serialize(&TunnelInitResponse::Success)?;
+                    agent_tcp_connection
+                        .send(&tunnel_init_success_response)
+                        .await?;
+                    Ok(destination_edge)
+                }
+            },
             TunnelInitRequest::Udp => Ok(DestinationEdge::start_udp().await?),
         }
     }
@@ -75,13 +107,31 @@ impl Tunnel {
         destination_edge: DestinationEdge,
     ) -> Result<(), CommonError> {
         match destination_edge {
+            DestinationEdge::Forward(proxy_tcp_connection) => {
+                let agent_socket_address = agent_tcp_connection.agent_socket_address();
+                let proxy_socket_address = proxy_tcp_connection.proxy_socket_address();
+                let agent_tcp_connection = StreamReader::new(agent_tcp_connection);
+                let mut agent_tcp_connection = SinkWriter::new(agent_tcp_connection);
+                let proxy_tcp_connection = StreamReader::new(proxy_tcp_connection);
+                let mut proxy_tcp_connection = SinkWriter::new(proxy_tcp_connection);
+                debug!("[FORWARDING] Going to copy bidirectional between agent [{agent_socket_address}] and proxy [{proxy_socket_address}]");
+                let (agent_data_size, proxy_data_size) =
+                    copy_bidirectional(&mut agent_tcp_connection, &mut proxy_tcp_connection)
+                        .await?;
+                debug!("[FORWARDING] Copy data between agent and proxy, agent data size: {agent_data_size}, proxy data size: {proxy_data_size}");
+            }
             DestinationEdge::Tcp(destination_tcp_endpoint) => {
+                let agent_socket_address = agent_tcp_connection.agent_socket_address();
+                let destination_address = destination_tcp_endpoint.destination_address().clone();
                 let agent_tcp_connection = StreamReader::new(agent_tcp_connection);
                 let mut agent_tcp_connection = SinkWriter::new(agent_tcp_connection);
                 let destination_tcp_endpoint = StreamReader::new(destination_tcp_endpoint);
                 let mut destination_tcp_connection = SinkWriter::new(destination_tcp_endpoint);
-                copy_bidirectional(&mut agent_tcp_connection, &mut destination_tcp_connection)
-                    .await?;
+                debug!("[PROXYING] Going to copy bidirectional between agent [{agent_socket_address}] and destination [{destination_address}]");
+                let (agent_data_size, destination_data_size) =
+                    copy_bidirectional(&mut agent_tcp_connection, &mut destination_tcp_connection)
+                        .await?;
+                debug!("[PROXYING] Copy data between agent and destination, agent data size: {agent_data_size}, destination data size: {destination_data_size}");
             }
             DestinationEdge::Udp(destination_udp_endpoint) => {
                 let agent_tcp_connection = Arc::new(Mutex::new(agent_tcp_connection));
@@ -113,9 +163,13 @@ impl Tunnel {
         Ok(())
     }
     pub async fn run(mut self) -> Result<(), CommonError> {
-        let destination_edge =
-            Self::initialize_tunnel(&mut self.agent_tcp_connection, self.agent_socket_address)
-                .await?;
+        let destination_edge = Self::initialize_tunnel(
+            &mut self.agent_tcp_connection,
+            self.agent_socket_address,
+            self.config.as_ref(),
+            self.forward_rsa_crypto_repo,
+        )
+        .await?;
         Self::relay(self.agent_tcp_connection, destination_edge).await
     }
 }
@@ -123,6 +177,7 @@ impl Tunnel {
 pub async fn handle_agent_connection<T>(
     config: Arc<ProxyConfig>,
     rsa_crypto_repo: Arc<T>,
+    forward_rsa_crypto_repo: Option<Arc<T>>,
     agent_tcp_stream: TcpStream,
     agent_socket_address: SocketAddr,
 ) -> Result<(), CommonError>
@@ -134,6 +189,7 @@ where
         agent_tcp_stream,
         agent_socket_address,
         rsa_crypto_repo.as_ref(),
+        forward_rsa_crypto_repo.as_deref(),
     )
     .await?;
     tunnel.run().await

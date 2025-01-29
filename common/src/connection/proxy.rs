@@ -15,7 +15,7 @@ use std::task::{ready, Context, Poll};
 use tokio::net::{TcpStream, ToSocketAddrs};
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Framed, FramedParts, LengthDelimitedCodec};
-use tracing::debug;
+use tracing::{debug, trace};
 pub type ProxyTcpConnectionWrite = SplitSink<ProxyTcpConnection, BytesMut>;
 pub type ProxyTcpConnectionRead = SplitStream<ProxyTcpConnection>;
 pub struct ProxyTcpConnection {
@@ -107,7 +107,13 @@ impl Stream for ProxyTcpConnection {
                 Ok(proxy_data) => match proxy_encryption.as_ref() {
                     Encryption::Plain => Poll::Ready(Some(Ok(proxy_data))),
                     Encryption::Aes(token) => match decrypt_with_aes(&token, &proxy_data) {
-                        Ok(raw_data) => Poll::Ready(Some(Ok(BytesMut::from_iter(raw_data)))),
+                        Ok(raw_data) => {
+                            trace!(
+                                "Proxy tcp connection receive data:\n{}",
+                                pretty_hex::pretty_hex(&raw_data)
+                            );
+                            Poll::Ready(Some(Ok(BytesMut::from_iter(raw_data))))
+                        }
                         Err(e) => Poll::Ready(Some(Err(e.into()))),
                     },
                     Encryption::Blowfish(_) => {
@@ -131,7 +137,13 @@ impl Sink<&[u8]> for ProxyTcpConnection {
     fn start_send(self: Pin<&mut Self>, item: &[u8]) -> Result<(), CommonError> {
         let item = match self.agent_encryption.as_ref() {
             Encryption::Plain => BytesMut::from(item),
-            Encryption::Aes(token) => BytesMut::from_iter(encrypt_with_aes(token, &item)?),
+            Encryption::Aes(token) => {
+                trace!(
+                    "Proxy tcp connection send data:\n{}",
+                    pretty_hex::pretty_hex(&item)
+                );
+                BytesMut::from_iter(encrypt_with_aes(token, &item)?)
+            }
             Encryption::Blowfish(_) => {
                 todo!()
             }

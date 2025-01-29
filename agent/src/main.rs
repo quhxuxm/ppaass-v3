@@ -12,6 +12,7 @@ use tracing::error;
 mod command;
 mod config;
 mod error;
+mod pool;
 mod tunnel;
 const USER_SERVER_PUBLIC_KEY: &str = "ProxyPublicKey.pem";
 const USER_AGENT_PRIVATE_KEY: &str = "AgentPrivateKey.pem";

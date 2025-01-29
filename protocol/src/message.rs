@@ -7,9 +7,9 @@ pub enum Encryption {
     /// The data will send in plain
     Plain,
     /// The data will send with aes encryption
-    Aes(Vec<u8>),
+    Aes(#[serde(with = "crate::hex")] Vec<u8>),
     /// The data will send with blowfish encryption
-    Blowfish(Vec<u8>),
+    Blowfish(#[serde(with = "crate::hex")] Vec<u8>),
 }
 
 /// The handshake message between agent and proxy.
@@ -72,6 +72,7 @@ pub enum TunnelInitResponse {
 pub struct UdpRelayDataRequest {
     pub destination_address: UnifiedAddress,
     pub source_address: UnifiedAddress,
+    #[serde(with = "crate::hex")]
     pub payload: Vec<u8>,
 }
 
@@ -79,5 +80,6 @@ pub struct UdpRelayDataRequest {
 pub struct UdpRelayDataResponse {
     pub destination_address: UnifiedAddress,
     pub source_address: UnifiedAddress,
+    #[serde(with = "crate::hex")]
     pub payload: Vec<u8>,
 }
