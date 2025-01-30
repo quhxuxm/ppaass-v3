@@ -61,7 +61,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         )?)),
     };
     trace!("Success to create forward agent_rsa crypto repo: {rsa_crypto_repo:?}");
-    let server = CommonServer::new(config.clone(), config, rsa_crypto_repo);
+    let server = CommonServer::new(
+        config.clone(),
+        config,
+        rsa_crypto_repo,
+        forward_rsa_crypto_repo.clone(),
+    );
     if let Err(e) = server.run(
         move |config,
               rsa_crypto_repo,

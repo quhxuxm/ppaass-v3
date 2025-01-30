@@ -1,12 +1,12 @@
 ip_v6 = false
 server_port = 10090
-#proxy_addresses = ["127.0.0.1:80"]
+#proxy_addresses = ["127.0.0.1:8080"]
 proxy_addresses = ["45.32.10.177:8080"]
 authentication = "user1"
 worker_thread_number = 64
 log_dir = "log"
 log_name_prefix = "ppaass-agent-v3"
-max_log_level = "debug"
+max_log_level = "error"
 rsa_dir = "resources/rsa"
 max_pool_size = 32
 fill_interval = 5

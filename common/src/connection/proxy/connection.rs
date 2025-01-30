@@ -17,6 +17,7 @@ use tracing::{debug, trace};
 pub type ProxyTcpConnectionWrite = SplitSink<ProxyTcpConnection, BytesMut>;
 pub type ProxyTcpConnectionRead = SplitStream<ProxyTcpConnection>;
 
+#[derive(Debug, Clone)]
 pub struct ProxyTcpConnectionInfo {
     proxy_addresses: Vec<SocketAddr>,
     authentication: String,

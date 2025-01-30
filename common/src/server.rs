@@ -18,6 +18,7 @@ where
         config: Arc<C>,
         proxy_tcp_connection_info_selector: Arc<S>,
         rsa_crypto_repo: Arc<R>,
+        forward_rsa_crypto_repo: Option<Arc<R>>,
     ) -> Self;
 
     fn config(&self) -> &C;
@@ -25,7 +26,7 @@ where
     fn clone_config(&self) -> Arc<C>;
 
     fn clone_rsa_crypto_repository(&self) -> Arc<R>;
-
+    fn clone_forward_rsa_crypto_repository(&self) -> Option<Arc<R>>;
     fn clone_proxy_tcp_connection_info_selector(&self) -> Arc<S>;
 
     fn run<F, Fut>(&self, connection_handler: F) -> Result<(), CommonError>
@@ -50,6 +51,7 @@ where
         let config = self.clone_config();
         let proxy_tcp_connection_info_selector = self.clone_proxy_tcp_connection_info_selector();
         let rsa_crypto_repo = self.clone_rsa_crypto_repository();
+        let forward_rsa_crypto_repo = self.clone_forward_rsa_crypto_repository();
         runtime.block_on(async move {
             let listener = if config.ip_v6() {
                 debug!(
@@ -90,11 +92,13 @@ where
 
             let proxy_tcp_connection_pool = match config.max_pool_size() {
                 None => None,
-                Some(_) => Some(
-                    match ProxyTcpConnectionPool::new(
+                Some(_) => {
+                    let proxy_pool_rsa_crypto_repo =
+                        forward_rsa_crypto_repo.unwrap_or_else(|| rsa_crypto_repo.clone());
+                    let proxy_tcp_connection_pool = match ProxyTcpConnectionPool::new(
                         config.clone(),
-                        rsa_crypto_repo.clone(),
-                        proxy_tcp_connection_info_selector.clone(),
+                        proxy_pool_rsa_crypto_repo,
+                        proxy_tcp_connection_info_selector,
                     )
                     .await
                     {
@@ -103,8 +107,9 @@ where
                             error!("Failed to initialize TCP connection pool: {}", e);
                             return;
                         }
-                    },
-                ),
+                    };
+                    Some(proxy_tcp_connection_pool)
+                }
             };
             loop {
                 let (agent_tcp_stream, agent_socket_address) = match listener.accept().await {
@@ -148,6 +153,7 @@ where
 {
     config: Arc<C>,
     rsa_crypto_repo: Arc<R>,
+    forward_rsa_crypto_repo: Option<Arc<R>>,
     proxy_tcp_connection_info_selector: Arc<S>,
 }
 impl<C, S, R> Server<C, S, R> for CommonServer<C, S, R>
@@ -160,10 +166,12 @@ where
         config: Arc<C>,
         proxy_tcp_connection_info_selector: Arc<S>,
         rsa_crypto_repo: Arc<R>,
+        forward_rsa_crypto_repo: Option<Arc<R>>,
     ) -> Self {
         Self {
             config,
             rsa_crypto_repo,
+            forward_rsa_crypto_repo,
             proxy_tcp_connection_info_selector,
         }
     }
@@ -175,6 +183,9 @@ where
     }
     fn clone_rsa_crypto_repository(&self) -> Arc<R> {
         self.rsa_crypto_repo.clone()
+    }
+    fn clone_forward_rsa_crypto_repository(&self) -> Option<Arc<R>> {
+        self.forward_rsa_crypto_repo.clone()
     }
     fn clone_proxy_tcp_connection_info_selector(&self) -> Arc<S> {
         self.proxy_tcp_connection_info_selector.clone()

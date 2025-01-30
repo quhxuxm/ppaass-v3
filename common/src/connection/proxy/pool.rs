@@ -198,28 +198,35 @@ where
                             return;
                         }
                     };
-                    match ProxyTcpConnection::create(proxy_addresses, rsa_crypto_repo.as_ref())
-                        .await
+                    debug!("Going to create proxy tcp connection with forward proxy address: {proxy_addresses:?}");
+                    match ProxyTcpConnection::create(
+                        proxy_addresses.clone(),
+                        rsa_crypto_repo.as_ref(),
+                    )
+                    .await
                     {
                         Ok(proxy_tcp_connection) => {
+                            debug!(
+                                "Create forward proxy tcp connection success: {proxy_addresses:?}"
+                            );
                             if let Err(e) = proxy_tcp_connection_tx.send(proxy_tcp_connection).await
                             {
                                 error!("Fail to send proxy tcp connection: {e:?}")
                             }
                         }
                         Err(e) => {
-                            error!("Failed to create proxy connection: {e}");
+                            error!("Failed to create proxy connection [{proxy_addresses:?}]: {e}");
                         }
                     }
                 });
             }
             drop(proxy_tcp_connection_tx);
-            debug!("Waiting for proxy connection creation");
+            debug!("Waiting for proxy connection creation result.");
             while let Some(proxy_tcp_connection) = proxy_tcp_connection_rx.recv().await {
                 match pool.push(proxy_tcp_connection) {
                     Ok(()) => {
                         debug!(
-                            "Proxy connection creation add to pool, current pool size: {}",
+                            "Proxy connection created, add to pool, current pool size: {}",
                             pool.len()
                         );
                     }
