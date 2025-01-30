@@ -5,7 +5,8 @@ use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
 
 use ppaass_common::{
-    AgentTcpConnection, TunnelInitRequest, TunnelInitResponse, UdpRelayDataRequest,
+    AgentTcpConnection, ProxyTcpConnectionInfoSelector, ProxyTcpConnectionPool, TunnelInitRequest,
+    TunnelInitResponse, UdpRelayDataRequest,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -25,6 +26,8 @@ where
     agent_tcp_connection: AgentTcpConnection,
     agent_socket_address: SocketAddr,
     forward_rsa_crypto_repo: Option<&'a T>,
+    forward_proxy_tcp_connection_pool:
+        Option<Arc<ProxyTcpConnectionPool<ProxyConfig, ProxyConfig, T>>>,
 }
 
 impl<'a, T> Tunnel<'a, T>
@@ -37,6 +40,9 @@ where
         agent_socket_address: SocketAddr,
         rsa_crypto_repo: &'a T,
         forward_rsa_crypto_repo: Option<&'a T>,
+        forward_proxy_tcp_connection_pool: Option<
+            Arc<ProxyTcpConnectionPool<ProxyConfig, ProxyConfig, T>>,
+        >,
     ) -> Result<Self, CommonError>
     where
         T: RsaCryptoRepository + Send + Sync + 'static,
@@ -49,6 +55,7 @@ where
             agent_tcp_connection,
             agent_socket_address,
             forward_rsa_crypto_repo,
+            forward_proxy_tcp_connection_pool,
         })
     }
 
@@ -57,6 +64,9 @@ where
         agent_socket_address: SocketAddr,
         config: &ProxyConfig,
         forward_rsa_crypto_repo: Option<&T>,
+        forward_proxy_tcp_connection_pool: Option<
+            Arc<ProxyTcpConnectionPool<ProxyConfig, ProxyConfig, T>>,
+        >,
     ) -> Result<DestinationEdge, CommonError> {
         let agent_data = agent_tcp_connection
             .next()
@@ -78,13 +88,14 @@ where
                         .await?;
                     Ok(destination_edge)
                 }
-                Some(forward_proxies) => {
+                Some(_) => {
                     let destination_edge = DestinationEdge::start_forward(
-                        forward_proxies,
+                        config.select_proxy_tcp_connection_info()?,
                         forward_rsa_crypto_repo.ok_or(CommonError::Other(
                             "Forward rsa crypto repo not exist".to_string(),
                         ))?,
                         destination_address,
+                        forward_proxy_tcp_connection_pool,
                     )
                     .await?;
                     let tunnel_init_success_response =
@@ -165,6 +176,7 @@ where
             self.agent_socket_address,
             self.config.as_ref(),
             self.forward_rsa_crypto_repo,
+            self.forward_proxy_tcp_connection_pool,
         )
         .await?;
         Self::relay(self.agent_tcp_connection, destination_edge).await
@@ -177,6 +189,9 @@ pub async fn handle_agent_connection<T>(
     forward_rsa_crypto_repo: Option<Arc<T>>,
     agent_tcp_stream: TcpStream,
     agent_socket_address: SocketAddr,
+    forward_proxy_tcp_connection_pool: Option<
+        Arc<ProxyTcpConnectionPool<ProxyConfig, ProxyConfig, T>>,
+    >,
 ) -> Result<(), CommonError>
 where
     T: RsaCryptoRepository + Send + Sync + 'static,
@@ -187,6 +202,7 @@ where
         agent_socket_address,
         rsa_crypto_repo.as_ref(),
         forward_rsa_crypto_repo.as_deref(),
+        forward_proxy_tcp_connection_pool,
     )
     .await?;
     tunnel.run().await

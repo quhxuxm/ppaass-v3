@@ -4,11 +4,11 @@ use crate::config::AgentConfig;
 pub use client::*;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
+use ppaass_common::ProxyTcpConnectionPool;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
 use tracing::{debug, error};
-
 const SOCKS5_VERSION: u8 = 0x05;
 const SOCKS4_VERSION: u8 = 0x04;
 
@@ -17,6 +17,7 @@ pub async fn handle_client_connection<R>(
     rsa_crypto_repo: Arc<R>,
     client_tcp_stream: TcpStream,
     client_socket_address: SocketAddr,
+    proxy_tcp_connection_pool: Option<Arc<ProxyTcpConnectionPool<AgentConfig, AgentConfig, R>>>,
 ) -> Result<(), CommonError>
 where
     R: RsaCryptoRepository + Send + Sync + 'static,
@@ -37,6 +38,7 @@ where
                 config,
                 rsa_crypto_repo,
                 client_socket_addr,
+                proxy_tcp_connection_pool,
             )
             .await
         }
@@ -47,6 +49,7 @@ where
                 config,
                 rsa_crypto_repo,
                 client_socket_addr,
+                proxy_tcp_connection_pool,
             )
             .await
         }
@@ -57,6 +60,7 @@ where
                 config,
                 rsa_crypto_repo,
                 client_socket_addr,
+                proxy_tcp_connection_pool,
             )
             .await
         }

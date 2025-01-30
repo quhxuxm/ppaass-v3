@@ -54,7 +54,7 @@ pub fn init_logger(
 
 pub fn parse_to_socket_addresses<I, T>(addresses: I) -> Result<Vec<SocketAddr>, CommonError>
 where
-    I: IntoIterator<Item = T>,
+    I: Iterator<Item = T>,
     T: AsRef<str>,
 {
     let proxy_addresses = addresses

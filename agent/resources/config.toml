@@ -8,3 +8,6 @@ log_dir = "log"
 log_name_prefix = "ppaass-agent-v3"
 max_log_level = "debug"
 rsa_dir = "resources/rsa"
+max_pool_size = 32
+fill_interval = 5
+connection_retake_interval = 2

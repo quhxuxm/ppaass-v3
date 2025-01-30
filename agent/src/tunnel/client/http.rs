@@ -10,9 +10,9 @@ use hyper_util::rt::TokioIo;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
 use ppaass_common::{
-    check_proxy_init_tunnel_response, parse_to_socket_addresses,
+    check_proxy_init_tunnel_response,
     receive_proxy_tunnel_init_response, send_proxy_tunnel_init_request, ProxyTcpConnection,
-    UnifiedAddress,
+    ProxyTcpConnectionInfoSelector, ProxyTcpConnectionPool, UnifiedAddress,
 };
 
 use std::net::SocketAddr;
@@ -32,6 +32,7 @@ async fn client_http_request_handler<R>(
     rsa_crypto_repo: &R,
     client_socket_addr: SocketAddr,
     client_http_request: Request<Incoming>,
+    proxy_tcp_connection_pool: Option<Arc<ProxyTcpConnectionPool<AgentConfig, AgentConfig, R>>>,
 ) -> Result<Response<BoxBody<Bytes, hyper::Error>>, CommonError>
 where
     R: RsaCryptoRepository + Send + Sync + 'static,
@@ -53,12 +54,13 @@ where
         }
     };
     debug!("Receive client http request to destination: {destination_address:?}, client socket address: {client_socket_addr}");
-    let mut proxy_tcp_connection = ProxyTcpConnection::create(
-        config.authentication().to_owned(),
-        parse_to_socket_addresses(config.proxy_addresses())?.as_slice(),
-        rsa_crypto_repo,
-    )
-    .await?;
+    let mut proxy_tcp_connection = match proxy_tcp_connection_pool {
+        None => {
+            ProxyTcpConnection::create(config.select_proxy_tcp_connection_info()?, rsa_crypto_repo)
+                .await?
+        }
+        Some(pool) => pool.take_proxy_connection().await?,
+    };
     let proxy_socket_address = proxy_tcp_connection.proxy_socket_address();
     send_proxy_tunnel_init_request(
         &mut proxy_tcp_connection,
@@ -145,19 +147,24 @@ pub async fn http_protocol_proxy<R>(
     config: Arc<AgentConfig>,
     rsa_crypto_repo: Arc<R>,
     client_socket_addr: SocketAddr,
+    proxy_tcp_connection_pool: Option<Arc<ProxyTcpConnectionPool<AgentConfig, AgentConfig, R>>>,
 ) -> Result<(), CommonError>
 where
     R: RsaCryptoRepository + Send + Sync + 'static,
 {
     let client_tcp_io = TokioIo::new(client_tcp_stream);
-    let service_fn = ServiceBuilder::new().service(service_fn(|request| async {
-        client_http_request_handler(
-            config.as_ref(),
-            rsa_crypto_repo.as_ref(),
-            client_socket_addr,
-            request,
-        )
-        .await
+    let service_fn = ServiceBuilder::new().service(service_fn(|request| {
+        let proxy_tcp_connection_pool = proxy_tcp_connection_pool.clone();
+        async {
+            client_http_request_handler(
+                config.as_ref(),
+                rsa_crypto_repo.as_ref(),
+                client_socket_addr,
+                request,
+                proxy_tcp_connection_pool,
+            )
+            .await
+        }
     }));
     http1::Builder::new()
         .preserve_header_case(true)

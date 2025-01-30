@@ -1,5 +1,11 @@
 use accessory::Accessors;
 use ppaass_common::config::ServerConfig;
+use ppaass_common::error::CommonError;
+use ppaass_common::{
+    parse_to_socket_addresses, ProxyTcpConnectionInfo, ProxyTcpConnectionInfoSelector,
+    ProxyTcpConnectionPoolConfig,
+};
+use rand::random;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Accessors)]
@@ -22,6 +28,10 @@ pub struct ProxyConfig {
     forward_proxies: Option<Vec<ForwardProxyInfo>>,
     #[access(get)]
     forward_rsa_dir: Option<PathBuf>,
+
+    max_pool_size: Option<usize>,
+    fill_interval: Option<u64>,
+    connection_retake_interval: Option<u64>,
 }
 
 #[derive(Serialize, Deserialize, Accessors)]
@@ -43,18 +53,30 @@ impl ServerConfig for ProxyConfig {
         self.ip_v6
     }
 }
-impl Default for ProxyConfig {
-    fn default() -> Self {
-        Self {
-            server_port: 80,
-            worker_thread_number: 32,
-            ip_v6: false,
-            log_dir: PathBuf::from("log"),
-            log_name_prefix: "ppaass-v3-proxy".to_string(),
-            max_log_level: "info".to_string(),
-            agent_rsa_dir: PathBuf::from("agent_rsa"),
-            forward_rsa_dir: None,
-            forward_proxies: None,
-        }
+
+impl ProxyTcpConnectionPoolConfig for ProxyConfig {
+    fn max_pool_size(&self) -> Option<usize> {
+        self.max_pool_size
+    }
+    fn fill_interval(&self) -> Option<u64> {
+        self.fill_interval
+    }
+    fn connection_retake_interval(&self) -> Option<u64> {
+        self.connection_retake_interval
+    }
+}
+impl ProxyTcpConnectionInfoSelector for ProxyConfig {
+    fn select_proxy_tcp_connection_info(&self) -> Result<ProxyTcpConnectionInfo, CommonError> {
+        let forward_proxy_infos = self.forward_proxies.as_deref().ok_or(CommonError::Other(
+            "Forward proxy information not defined in configuration".to_string(),
+        ))?;
+        let select_index = random::<u32>() % forward_proxy_infos.len() as u32;
+        let forward_proxy_info = &forward_proxy_infos[select_index as usize];
+        let proxy_addresses =
+            parse_to_socket_addresses(vec![forward_proxy_info.proxy_address.clone()].iter())?;
+        Ok(ProxyTcpConnectionInfo::new(
+            proxy_addresses,
+            forward_proxy_info.proxy_auth.to_owned(),
+        ))
     }
 }

@@ -1,53 +1,77 @@
-use futures_util::stream::{SplitSink, SplitStream};
-use futures_util::{Sink, StreamExt};
-use futures_util::{SinkExt, Stream};
-use std::net::SocketAddr;
-
 use crate::connection::codec::{HandshakeRequestEncoder, HandshakeResponseDecoder};
 use crate::crypto::{decrypt_with_aes, encrypt_with_aes, RsaCryptoRepository};
 use crate::error::CommonError;
 use crate::random_32_bytes;
+use futures_util::stream::{SplitSink, SplitStream};
+use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use ppaass_protocol::{Encryption, HandshakeRequest, HandshakeResponse};
-
+use std::fmt::{Debug, Formatter};
+use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{ready, Context, Poll};
-use tokio::net::{TcpStream, ToSocketAddrs};
+use tokio::net::TcpStream;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Framed, FramedParts, LengthDelimitedCodec};
 use tracing::{debug, trace};
 pub type ProxyTcpConnectionWrite = SplitSink<ProxyTcpConnection, BytesMut>;
 pub type ProxyTcpConnectionRead = SplitStream<ProxyTcpConnection>;
+
+pub struct ProxyTcpConnectionInfo {
+    proxy_addresses: Vec<SocketAddr>,
+    authentication: String,
+}
+
+impl ProxyTcpConnectionInfo {
+    pub fn new(proxy_addresses: Vec<SocketAddr>, authentication: String) -> Self {
+        Self {
+            proxy_addresses,
+            authentication,
+        }
+    }
+    pub fn authentication(&self) -> &str {
+        &self.authentication
+    }
+    pub fn proxy_addresses(&self) -> &[SocketAddr] {
+        &self.proxy_addresses
+    }
+}
+
 pub struct ProxyTcpConnection {
     proxy_tcp_framed: Framed<TcpStream, LengthDelimitedCodec>,
     agent_encryption: Arc<Encryption>,
     proxy_encryption: Arc<Encryption>,
     proxy_socket_address: SocketAddr,
 }
-
+impl Debug for ProxyTcpConnection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "ProxyTcpConnection: {}", self.proxy_socket_address)
+    }
+}
 impl ProxyTcpConnection {
-    pub async fn create<A, R>(
-        authentication: String,
-        proxy_addresses: A,
+    pub async fn create<R>(
+        proxy_tcp_connection_info: ProxyTcpConnectionInfo,
         rsa_crypto_repo: &R,
     ) -> Result<Self, CommonError>
     where
         R: RsaCryptoRepository + Sync + Send + 'static,
-        A: ToSocketAddrs,
     {
-        let proxy_tcp_stream = TcpStream::connect(proxy_addresses).await?;
+        let proxy_tcp_stream =
+            TcpStream::connect(proxy_tcp_connection_info.proxy_addresses()).await?;
         let proxy_socket_address = proxy_tcp_stream.peer_addr()?;
         let agent_encryption_raw_aes_token = random_32_bytes();
         let rsa_crypto = rsa_crypto_repo
-            .get_rsa_crypto(&authentication)?
-            .ok_or(CommonError::RsaCryptoNotFound(authentication.clone()))?;
+            .get_rsa_crypto(proxy_tcp_connection_info.authentication())?
+            .ok_or(CommonError::RsaCryptoNotFound(
+                proxy_tcp_connection_info.authentication().to_owned(),
+            ))?;
         let encrypt_agent_encryption_aes_token =
             rsa_crypto.encrypt(&agent_encryption_raw_aes_token)?;
         let encrypt_agent_encryption = Encryption::Aes(encrypt_agent_encryption_aes_token);
         let mut handshake_request_framed =
             Framed::new(proxy_tcp_stream, HandshakeRequestEncoder::new());
         let handshake_request = HandshakeRequest {
-            authentication,
+            authentication: proxy_tcp_connection_info.authentication().to_owned(),
             encryption: encrypt_agent_encryption,
         };
         debug!("Begin to send handshake request to proxy: {handshake_request:?}");

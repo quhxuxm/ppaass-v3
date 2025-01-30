@@ -3,9 +3,9 @@ use crate::config::AgentConfig;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
 use ppaass_common::{
-    check_proxy_init_tunnel_response, parse_to_socket_addresses,
-    receive_proxy_tunnel_init_response, send_proxy_tunnel_init_request, ProxyTcpConnection,
-    UnifiedAddress,
+    check_proxy_init_tunnel_response, receive_proxy_tunnel_init_response,
+    send_proxy_tunnel_init_request, ProxyTcpConnection, ProxyTcpConnectionInfoSelector,
+    ProxyTcpConnectionPool, UnifiedAddress,
 };
 use socks5_impl::protocol::handshake::Request as Socks5HandshakeRequest;
 use socks5_impl::protocol::handshake::Response as Socks5HandshakeResponse;
@@ -23,6 +23,7 @@ pub async fn socks5_protocol_proxy<R>(
     config: Arc<AgentConfig>,
     rsa_crypto_repo: Arc<R>,
     client_socket_addr: SocketAddr,
+    proxy_tcp_connection_pool: Option<Arc<ProxyTcpConnectionPool<AgentConfig, AgentConfig, R>>>,
 ) -> Result<(), CommonError>
 where
     R: RsaCryptoRepository + Send + Sync + 'static,
@@ -41,12 +42,16 @@ where
     match init_request.command {
         Socks5InitCommand::Connect => {
             debug!("Receive socks5 CONNECT command: {client_tcp_stream:?}");
-            let mut proxy_tcp_connection = ProxyTcpConnection::create(
-                config.authentication().to_owned(),
-                parse_to_socket_addresses(config.proxy_addresses())?.as_slice(),
-                rsa_crypto_repo.as_ref(),
-            )
-            .await?;
+            let mut proxy_tcp_connection = match proxy_tcp_connection_pool {
+                None => {
+                    ProxyTcpConnection::create(
+                        config.select_proxy_tcp_connection_info()?,
+                        rsa_crypto_repo.as_ref(),
+                    )
+                    .await?
+                }
+                Some(pool) => pool.take_proxy_connection().await?,
+            };
 
             let proxy_socket_address = proxy_tcp_connection.proxy_socket_address();
             let destination_address = match &init_request.address {

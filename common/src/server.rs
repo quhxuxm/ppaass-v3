@@ -1,18 +1,24 @@
 use crate::config::ServerConfig;
 use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
+use crate::{ProxyTcpConnectionInfoSelector, ProxyTcpConnectionPool, ProxyTcpConnectionPoolConfig};
 use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::runtime::Builder;
 use tracing::{debug, error, info};
-pub trait Server<C, R>
+pub trait Server<C, S, R>
 where
-    C: ServerConfig + Send + Sync + 'static,
+    C: ServerConfig + ProxyTcpConnectionPoolConfig + Send + Sync + 'static,
+    S: ProxyTcpConnectionInfoSelector + Send + Sync + 'static,
     R: RsaCryptoRepository + Send + Sync + 'static,
 {
-    fn new(config: Arc<C>, rsa_crypto_repo: Arc<R>) -> Self;
+    fn new(
+        config: Arc<C>,
+        proxy_tcp_connection_info_selector: Arc<S>,
+        rsa_crypto_repo: Arc<R>,
+    ) -> Self;
 
     fn config(&self) -> &C;
 
@@ -20,9 +26,21 @@ where
 
     fn clone_rsa_crypto_repository(&self) -> Arc<R>;
 
+    fn clone_proxy_tcp_connection_info_selector(&self) -> Arc<S>;
+
     fn run<F, Fut>(&self, connection_handler: F) -> Result<(), CommonError>
     where
-        F: Fn(Arc<C>, Arc<R>, TcpStream, SocketAddr) -> Fut + Send + Sync + Clone + 'static,
+        F: Fn(
+                Arc<C>,
+                Arc<R>,
+                TcpStream,
+                SocketAddr,
+                Option<Arc<ProxyTcpConnectionPool<C, S, R>>>,
+            ) -> Fut
+            + Send
+            + Sync
+            + Clone
+            + 'static,
         Fut: Future<Output = Result<(), CommonError>> + Send + 'static,
     {
         let runtime = Builder::new_multi_thread()
@@ -30,6 +48,7 @@ where
             .worker_threads(self.config().worker_thread_number())
             .build()?;
         let config = self.clone_config();
+        let proxy_tcp_connection_info_selector = self.clone_proxy_tcp_connection_info_selector();
         let rsa_crypto_repo = self.clone_rsa_crypto_repository();
         runtime.block_on(async move {
             let listener = if config.ip_v6() {
@@ -68,6 +87,25 @@ where
                 }
             };
             info!("Server listening on port: {}", config.server_port());
+
+            let proxy_tcp_connection_pool = match config.max_pool_size() {
+                None => None,
+                Some(_) => Some(
+                    match ProxyTcpConnectionPool::new(
+                        config.clone(),
+                        rsa_crypto_repo.clone(),
+                        proxy_tcp_connection_info_selector.clone(),
+                    )
+                    .await
+                    {
+                        Ok(pool) => Arc::new(pool),
+                        Err(e) => {
+                            error!("Failed to initialize TCP connection pool: {}", e);
+                            return;
+                        }
+                    },
+                ),
+            };
             loop {
                 let (agent_tcp_stream, agent_socket_address) = match listener.accept().await {
                     Ok(agent_tcp_accept_result) => agent_tcp_accept_result,
@@ -79,12 +117,14 @@ where
                 let config = config.clone();
                 let rsa_crypto_repo = rsa_crypto_repo.clone();
                 let connection_handler = connection_handler.clone();
+                let proxy_tcp_connection_pool = proxy_tcp_connection_pool.clone();
                 tokio::spawn(async move {
                     if let Err(e) = connection_handler(
                         config,
                         rsa_crypto_repo,
                         agent_tcp_stream,
                         agent_socket_address,
+                        proxy_tcp_connection_pool,
                     )
                     .await
                     {
@@ -100,23 +140,31 @@ where
     }
 }
 
-pub struct CommonServer<C, R>
+pub struct CommonServer<C, S, R>
 where
     C: ServerConfig + Send + Sync + 'static,
+    S: ProxyTcpConnectionInfoSelector + Send + Sync + 'static,
     R: RsaCryptoRepository + Send + Sync + 'static,
 {
     config: Arc<C>,
     rsa_crypto_repo: Arc<R>,
+    proxy_tcp_connection_info_selector: Arc<S>,
 }
-impl<C, R> Server<C, R> for CommonServer<C, R>
+impl<C, S, R> Server<C, S, R> for CommonServer<C, S, R>
 where
-    C: ServerConfig + Send + Sync + 'static,
+    C: ServerConfig + ProxyTcpConnectionPoolConfig + Send + Sync + 'static,
+    S: ProxyTcpConnectionInfoSelector + Send + Sync + 'static,
     R: RsaCryptoRepository + Send + Sync + 'static,
 {
-    fn new(config: Arc<C>, rsa_crypto_repo: Arc<R>) -> Self {
+    fn new(
+        config: Arc<C>,
+        proxy_tcp_connection_info_selector: Arc<S>,
+        rsa_crypto_repo: Arc<R>,
+    ) -> Self {
         Self {
             config,
             rsa_crypto_repo,
+            proxy_tcp_connection_info_selector,
         }
     }
     fn config(&self) -> &C {
@@ -127,5 +175,8 @@ where
     }
     fn clone_rsa_crypto_repository(&self) -> Arc<R> {
         self.rsa_crypto_repo.clone()
+    }
+    fn clone_proxy_tcp_connection_info_selector(&self) -> Arc<S> {
+        self.proxy_tcp_connection_info_selector.clone()
     }
 }

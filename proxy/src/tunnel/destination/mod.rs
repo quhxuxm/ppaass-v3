@@ -1,14 +1,14 @@
 mod tcp;
 mod udp;
-use crate::ForwardProxyInfo;
+use crate::ProxyConfig;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
 use ppaass_common::{
-    check_proxy_init_tunnel_response, parse_to_socket_addresses,
-    receive_proxy_tunnel_init_response, send_proxy_tunnel_init_request, ProxyTcpConnection,
-    UnifiedAddress,
+    check_proxy_init_tunnel_response, receive_proxy_tunnel_init_response,
+    send_proxy_tunnel_init_request, ProxyTcpConnection, ProxyTcpConnectionInfo,
+    ProxyTcpConnectionPool, UnifiedAddress,
 };
-use rand::random;
+use std::sync::Arc;
 pub use tcp::*;
 use tracing::debug;
 pub use udp::*;
@@ -29,22 +29,23 @@ impl DestinationEdge {
     }
 
     pub async fn start_forward<T>(
-        forward_proxies: &[ForwardProxyInfo],
+        proxy_tcp_connection_info: ProxyTcpConnectionInfo,
         forward_rsa_crypto_repo: &T,
         destination_address: UnifiedAddress,
+        forward_proxy_tcp_connection_pool: Option<
+            Arc<ProxyTcpConnectionPool<ProxyConfig, ProxyConfig, T>>,
+        >,
     ) -> Result<Self, CommonError>
     where
         T: RsaCryptoRepository + Send + Sync + 'static,
     {
-        let proxy_index = random::<u32>() % forward_proxies.len() as u32;
-        let proxy_info = &forward_proxies[proxy_index as usize];
-        let mut proxy_tcp_connection = ProxyTcpConnection::create(
-            proxy_info.proxy_auth.clone(),
-            parse_to_socket_addresses(vec![&proxy_info.proxy_address])?.as_slice(),
-            forward_rsa_crypto_repo,
-        )
-        .await?;
-
+        let mut proxy_tcp_connection = match forward_proxy_tcp_connection_pool {
+            None => {
+                ProxyTcpConnection::create(proxy_tcp_connection_info, forward_rsa_crypto_repo)
+                    .await?
+            }
+            Some(pool) => pool.take_proxy_connection().await?,
+        };
         let proxy_socket_address = proxy_tcp_connection.proxy_socket_address();
         debug!("Success to create forward proxy tcp connection: {proxy_socket_address}");
         send_proxy_tunnel_init_request(
