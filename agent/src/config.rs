@@ -31,6 +31,8 @@ pub struct AgentConfig {
     agent_to_proxy_data_relay_buffer_size: usize,
     #[access(get(cp))]
     proxy_to_agent_data_relay_buffer_size: usize,
+    #[access(get(cp))]
+    proxy_framed_buffer_size: usize,
 }
 
 impl ServerConfig for AgentConfig {
@@ -62,6 +64,7 @@ impl ProxyTcpConnectionInfoSelector for AgentConfig {
         Ok(ProxyTcpConnectionInfo::new(
             parse_to_socket_addresses(self.proxy_addresses.iter())?,
             self.authentication.clone(),
+            self.proxy_framed_buffer_size(),
         ))
     }
 }

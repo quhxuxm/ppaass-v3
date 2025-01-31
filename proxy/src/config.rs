@@ -36,6 +36,8 @@ pub struct ProxyConfig {
     proxy_to_destination_data_relay_buffer_size: usize,
     #[access(get(cp))]
     destination_to_proxy_data_relay_buffer_size: usize,
+    #[access(get(cp))]
+    forward_proxy_framed_buffer_size: usize,
 }
 
 #[derive(Serialize, Deserialize, Accessors)]
@@ -81,6 +83,7 @@ impl ProxyTcpConnectionInfoSelector for ProxyConfig {
         Ok(ProxyTcpConnectionInfo::new(
             proxy_addresses,
             forward_proxy_info.proxy_auth.to_owned(),
+            self.forward_proxy_framed_buffer_size(),
         ))
     }
 }

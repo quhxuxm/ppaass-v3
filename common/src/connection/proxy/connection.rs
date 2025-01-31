@@ -21,13 +21,19 @@ pub type ProxyTcpConnectionRead = SplitStream<ProxyTcpConnection>;
 pub struct ProxyTcpConnectionInfo {
     proxy_addresses: Vec<SocketAddr>,
     authentication: String,
+    frame_buffer_size: usize,
 }
 
 impl ProxyTcpConnectionInfo {
-    pub fn new(proxy_addresses: Vec<SocketAddr>, authentication: String) -> Self {
+    pub fn new(
+        proxy_addresses: Vec<SocketAddr>,
+        authentication: String,
+        frame_buffer_size: usize,
+    ) -> Self {
         Self {
             proxy_addresses,
             authentication,
+            frame_buffer_size,
         }
     }
     pub fn authentication(&self) -> &str {
@@ -35,6 +41,10 @@ impl ProxyTcpConnectionInfo {
     }
     pub fn proxy_addresses(&self) -> &[SocketAddr] {
         &self.proxy_addresses
+    }
+
+    pub fn frame_buffer_size(&self) -> usize {
+        self.frame_buffer_size
     }
 }
 
@@ -110,7 +120,11 @@ impl ProxyTcpConnection {
         } = handshake_response_framed.into_parts();
         let proxy_socket_address = proxy_tcp_stream.peer_addr()?;
         Ok(Self {
-            proxy_tcp_framed: Framed::new(proxy_tcp_stream, LengthDelimitedCodec::new()),
+            proxy_tcp_framed: Framed::with_capacity(
+                proxy_tcp_stream,
+                LengthDelimitedCodec::new(),
+                proxy_tcp_connection_info.frame_buffer_size(),
+            ),
             agent_encryption: Arc::new(agent_encryption),
             proxy_encryption: Arc::new(proxy_encryption),
             proxy_socket_address,
