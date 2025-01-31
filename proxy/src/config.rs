@@ -28,16 +28,15 @@ pub struct ProxyConfig {
     forward_proxies: Option<Vec<ForwardProxyInfo>>,
     #[access(get)]
     forward_rsa_dir: Option<PathBuf>,
-
-    max_pool_size: Option<usize>,
-    fill_interval: Option<u64>,
-    connection_retake_interval: Option<u64>,
+    forward_max_pool_size: Option<usize>,
+    forward_fill_interval: Option<u64>,
+    forward_connection_retake_interval: Option<u64>,
     #[access(get(cp))]
     proxy_to_destination_data_relay_buffer_size: usize,
     #[access(get(cp))]
     destination_to_proxy_data_relay_buffer_size: usize,
     #[access(get(cp))]
-    forward_proxy_framed_buffer_size: usize,
+    forward_proxy_framed_buffer_size: Option<usize>,
 }
 
 #[derive(Serialize, Deserialize, Accessors)]
@@ -62,13 +61,13 @@ impl ServerConfig for ProxyConfig {
 
 impl ProxyTcpConnectionPoolConfig for ProxyConfig {
     fn max_pool_size(&self) -> Option<usize> {
-        self.max_pool_size
+        self.forward_max_pool_size
     }
     fn fill_interval(&self) -> Option<u64> {
-        self.fill_interval
+        self.forward_fill_interval
     }
     fn connection_retake_interval(&self) -> Option<u64> {
-        self.connection_retake_interval
+        self.forward_connection_retake_interval
     }
 }
 impl ProxyTcpConnectionInfoSelector for ProxyConfig {
@@ -83,7 +82,7 @@ impl ProxyTcpConnectionInfoSelector for ProxyConfig {
         Ok(ProxyTcpConnectionInfo::new(
             proxy_addresses,
             forward_proxy_info.proxy_auth.to_owned(),
-            self.forward_proxy_framed_buffer_size(),
+            self.forward_proxy_framed_buffer_size().unwrap_or(65536),
         ))
     }
 }
