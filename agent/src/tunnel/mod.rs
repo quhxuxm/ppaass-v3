@@ -7,6 +7,7 @@ use ppaass_common::server::ServerState;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
+use tokio_tfo::TfoStream;
 use tracing::{debug, error};
 const SOCKS5_VERSION: u8 = 0x05;
 const SOCKS4_VERSION: u8 = 0x04;
@@ -28,15 +29,33 @@ pub async fn handle_client_connection(
     match protocol[0] {
         SOCKS5_VERSION => {
             debug!("Client tcp stream using socks5 protocol: {client_socket_addr}");
-            socks5_protocol_proxy(client_tcp_stream, client_socket_addr, config, server_state).await
+            socks5_protocol_proxy(
+                TfoStream::from(client_tcp_stream),
+                client_socket_addr,
+                config,
+                server_state,
+            )
+            .await
         }
         SOCKS4_VERSION => {
             debug!("Client tcp stream using socks4 protocol: {client_socket_addr}");
-            socks4_protocol_proxy(client_tcp_stream, client_socket_addr, config, server_state).await
+            socks4_protocol_proxy(
+                TfoStream::from(client_tcp_stream),
+                client_socket_addr,
+                config,
+                server_state,
+            )
+            .await
         }
         _ => {
             debug!("Client tcp stream using http protocol: {client_socket_addr}");
-            http_protocol_proxy(client_tcp_stream, client_socket_addr, config, server_state).await
+            http_protocol_proxy(
+                TfoStream::from(client_tcp_stream),
+                client_socket_addr,
+                config,
+                server_state,
+            )
+            .await
         }
     }
 }

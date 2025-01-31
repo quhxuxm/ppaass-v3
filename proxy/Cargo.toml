@@ -16,3 +16,4 @@ bincode = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
 toml = { workspace = true }
 rand = { workspace = true }
+tokio-tfo = { workspace = true }

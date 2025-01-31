@@ -6,7 +6,6 @@ use std::future::Future;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
-
 use tracing::{debug, error, info};
 
 pub struct ServerState {

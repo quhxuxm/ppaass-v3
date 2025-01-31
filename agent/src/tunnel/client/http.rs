@@ -18,7 +18,7 @@ use ppaass_common::{
 use ppaass_common::server::ServerState;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::net::TcpStream;
+use tokio_tfo::TfoStream;
 use tokio_util::io::{SinkWriter, StreamReader};
 use tower::ServiceBuilder;
 use tracing::{debug, error, info};
@@ -153,7 +153,7 @@ async fn client_http_request_handler(
 }
 
 pub async fn http_protocol_proxy(
-    client_tcp_stream: TcpStream,
+    client_tcp_stream: TfoStream,
     client_socket_addr: SocketAddr,
     config: Arc<AgentConfig>,
     server_state: Arc<ServerState>,

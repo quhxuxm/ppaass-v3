@@ -3,10 +3,10 @@ use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::net::TcpStream;
+use tokio_tfo::TfoStream;
 use tracing::debug;
 pub async fn socks4_protocol_proxy(
-    _client_tcp_stream: TcpStream,
+    _client_tcp_stream: TfoStream,
     client_socket_addr: SocketAddr,
     _config: Arc<AgentConfig>,
     _server_state: Arc<ServerState>,

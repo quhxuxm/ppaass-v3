@@ -7,7 +7,7 @@ use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
-
+use tokio_tfo::TfoStream;
 use tracing::error;
 #[derive(Clone)]
 pub struct DestinationUdpEndpoint {}
@@ -19,7 +19,7 @@ impl DestinationUdpEndpoint {
 
     pub async fn replay(
         &self,
-        agent_tcp_connection: Arc<Mutex<AgentTcpConnection>>,
+        agent_tcp_connection: Arc<Mutex<AgentTcpConnection<TfoStream>>>,
         data: &[u8],
         source_address: UnifiedAddress,
         destination_address: UnifiedAddress,

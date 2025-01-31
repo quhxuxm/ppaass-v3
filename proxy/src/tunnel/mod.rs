@@ -4,25 +4,25 @@ use futures_util::{SinkExt, StreamExt};
 use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
 
+use crate::crypto::ForwardProxyRsaCryptoRepository;
+use ppaass_common::server::ServerState;
 use ppaass_common::{
-    AgentTcpConnection, ProxyTcpConnectionInfoSelector, TunnelInitRequest,
-    TunnelInitResponse, UdpRelayDataRequest,
+    AgentTcpConnection, ProxyTcpConnectionInfoSelector, TunnelInitRequest, TunnelInitResponse,
+    UdpRelayDataRequest,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::io::{copy_bidirectional, copy_bidirectional_with_sizes};
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
-
-use crate::crypto::ForwardProxyRsaCryptoRepository;
-use ppaass_common::server::ServerState;
+use tokio_tfo::TfoStream;
 use tokio_util::io::{SinkWriter, StreamReader};
 use tracing::debug;
 mod destination;
 
 pub struct Tunnel {
     config: Arc<ProxyConfig>,
-    agent_tcp_connection: AgentTcpConnection,
+    agent_tcp_connection: AgentTcpConnection<TfoStream>,
     agent_socket_address: SocketAddr,
     server_state: Arc<ServerState>,
 }
@@ -31,7 +31,7 @@ impl Tunnel {
     pub async fn new(
         config: Arc<ProxyConfig>,
         server_state: Arc<ServerState>,
-        agent_tcp_stream: TcpStream,
+        agent_tcp_stream: TfoStream,
         agent_socket_address: SocketAddr,
     ) -> Result<Self, CommonError> {
         let rsa_crypto_repo = server_state
@@ -54,7 +54,7 @@ impl Tunnel {
     }
 
     async fn initialize_tunnel(
-        agent_tcp_connection: &mut AgentTcpConnection,
+        agent_tcp_connection: &mut AgentTcpConnection<TfoStream>,
         agent_socket_address: SocketAddr,
         config: &ProxyConfig,
         server_state: &ServerState,
@@ -100,7 +100,7 @@ impl Tunnel {
     }
 
     async fn relay(
-        agent_tcp_connection: AgentTcpConnection,
+        agent_tcp_connection: AgentTcpConnection<TfoStream>,
         destination_edge: DestinationEdge,
         config: &ProxyConfig,
     ) -> Result<(), CommonError> {
@@ -187,6 +187,12 @@ pub async fn handle_agent_connection(
     agent_tcp_stream: TcpStream,
     agent_socket_address: SocketAddr,
 ) -> Result<(), CommonError> {
-    let tunnel = Tunnel::new(config, server_state, agent_tcp_stream, agent_socket_address).await?;
+    let tunnel = Tunnel::new(
+        config,
+        server_state,
+        TfoStream::from(agent_tcp_stream),
+        agent_socket_address,
+    )
+    .await?;
     tunnel.run().await
 }

@@ -10,23 +10,29 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{ready, Context, Poll};
-use tokio::net::TcpStream;
+use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Framed, FramedParts, LengthDelimitedCodec};
 use tracing::trace;
-pub type AgentTcpConnectionWrite = SplitSink<AgentTcpConnection, BytesMut>;
-pub type AgentTcpConnectionRead = SplitStream<AgentTcpConnection>;
-pub struct AgentTcpConnection {
-    agent_tcp_framed: Framed<TcpStream, LengthDelimitedCodec>,
+pub type AgentTcpConnectionWrite<T> = SplitSink<AgentTcpConnection<T>, BytesMut>;
+pub type AgentTcpConnectionRead<T> = SplitStream<AgentTcpConnection<T>>;
+pub struct AgentTcpConnection<T>
+where
+    T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
+{
+    agent_tcp_framed: Framed<T, LengthDelimitedCodec>,
     agent_socket_address: SocketAddr,
     authentication: String,
     agent_encryption: Arc<Encryption>,
     proxy_encryption: Arc<Encryption>,
 }
 
-impl AgentTcpConnection {
+impl<T> AgentTcpConnection<T>
+where
+    T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
+{
     pub async fn create<R>(
-        agent_tcp_stream: TcpStream,
+        agent_tcp_stream: T,
         agent_socket_address: SocketAddr,
         rsa_crypto_repo: &R,
     ) -> Result<Self, CommonError>
@@ -88,7 +94,10 @@ impl AgentTcpConnection {
     }
 }
 
-impl Stream for AgentTcpConnection {
+impl<T> Stream for AgentTcpConnection<T>
+where
+    T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
+{
     type Item = Result<BytesMut, CommonError>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let agent_encryption = self.agent_encryption.clone();
@@ -119,7 +128,10 @@ impl Stream for AgentTcpConnection {
     }
 }
 
-impl Sink<&[u8]> for AgentTcpConnection {
+impl<T> Sink<&[u8]> for AgentTcpConnection<T>
+where
+    T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
+{
     type Error = CommonError;
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
         self.get_mut()

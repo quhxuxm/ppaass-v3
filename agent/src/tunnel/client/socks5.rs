@@ -16,11 +16,11 @@ use socks5_impl::protocol::{
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::net::TcpStream;
+use tokio_tfo::TfoStream;
 use tokio_util::io::{SinkWriter, StreamReader};
 use tracing::{debug, error, info};
 pub async fn socks5_protocol_proxy(
-    mut client_tcp_stream: TcpStream,
+    mut client_tcp_stream: TfoStream,
     client_socket_addr: SocketAddr,
     config: Arc<AgentConfig>,
     server_state: Arc<ServerState>,
@@ -43,7 +43,7 @@ pub async fn socks5_protocol_proxy(
         )))?;
     match init_request.command {
         Socks5InitCommand::Connect => {
-            debug!("Receive socks5 CONNECT command: {client_tcp_stream:?}");
+            debug!("Receive socks5 CONNECT command: {client_socket_addr}");
             let proxy_tcp_connection_pool = server_state.get_value::<Arc< ProxyTcpConnectionPool<AgentConfig, AgentConfig, FileSystemRsaCryptoRepo>>>();
             let mut proxy_tcp_connection = match proxy_tcp_connection_pool {
                 None => {
@@ -105,13 +105,13 @@ pub async fn socks5_protocol_proxy(
             );
         }
         Socks5InitCommand::Bind => {
-            debug!("Receive socks5 BIND command: {client_tcp_stream:?}");
+            debug!("Receive socks5 BIND command: {client_socket_addr:?}");
             return Err(CommonError::Other(format!(
                 "Unsupported socks5 bind command: {client_socket_addr}"
             )));
         }
         Socks5InitCommand::UdpAssociate => {
-            debug!("Receive socks5 UDP ASSOCIATE command: {client_tcp_stream:?}");
+            debug!("Receive socks5 UDP ASSOCIATE command: {client_socket_addr:?}");
             return Err(CommonError::Other(format!(
                 "Unsupported socks5 udp associate command: {client_socket_addr}"
             )));
