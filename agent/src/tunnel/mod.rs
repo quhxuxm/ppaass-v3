@@ -3,10 +3,9 @@ mod client;
 use crate::config::AgentConfig;
 pub use client::*;
 use ppaass_common::error::CommonError;
-use ppaass_common::server::ServerState;
+use ppaass_common::server::{ServerState, ServerTcpStream};
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::net::TcpStream;
 use tokio_tfo::TfoStream;
 use tracing::{debug, error};
 const SOCKS5_VERSION: u8 = 0x05;
@@ -15,9 +14,14 @@ const SOCKS4_VERSION: u8 = 0x04;
 pub async fn handle_client_connection(
     config: Arc<AgentConfig>,
     server_state: Arc<ServerState>,
-    client_tcp_stream: TcpStream,
+    client_tcp_stream: ServerTcpStream,
     client_socket_address: SocketAddr,
 ) -> Result<(), CommonError> {
+    let ServerTcpStream::TcpStream(client_tcp_stream) = client_tcp_stream else {
+        return Err(CommonError::Other(format!(
+            "Agent server should use tcp stream: {client_socket_address}"
+        )));
+    };
     let client_tcp_stream = client_tcp_stream;
     let client_socket_addr = client_socket_address;
     let mut protocol = [0u8; 1];

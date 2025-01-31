@@ -10,7 +10,6 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{ready, Context, Poll};
-use tokio::net::TcpStream;
 use tokio_tfo::TfoStream;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Framed, FramedParts, LengthDelimitedCodec};
@@ -69,8 +68,7 @@ impl ProxyTcpConnection {
         R: RsaCryptoRepository + Sync + Send + 'static,
     {
         let proxy_tcp_stream =
-            TcpStream::connect(proxy_tcp_connection_info.proxy_addresses()).await?;
-        let proxy_tcp_stream = TfoStream::from(proxy_tcp_stream);
+            TfoStream::connect(proxy_tcp_connection_info.proxy_addresses()[0]).await?;
         proxy_tcp_stream.set_nodelay(true)?;
         proxy_tcp_stream.set_linger(None)?;
         let proxy_socket_address = proxy_tcp_stream.peer_addr()?;

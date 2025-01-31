@@ -5,7 +5,6 @@ use ppaass_common::UnifiedAddress;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use tokio::net::TcpStream;
 use tokio_tfo::TfoStream;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{BytesCodec, Framed};
@@ -27,8 +26,8 @@ impl DestinationTcpEndpoint {
                     "Fail to convert destination address to socket address: {e}"
                 ))
             })?;
-        let destination_tcp_stream = TcpStream::connect(destination_socks_addrs.as_slice()).await?;
-        let destination_tcp_stream = TfoStream::from(destination_tcp_stream);
+        let destination_tcp_stream =
+            TfoStream::connect(destination_socks_addrs.as_slice()[0]).await?;
         destination_tcp_stream.set_nodelay(true)?;
         debug!("Connected to destination success: {}", destination_address);
         Ok(DestinationTcpEndpoint {

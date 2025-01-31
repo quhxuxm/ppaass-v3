@@ -8,18 +8,19 @@ use crate::command::Command;
 use clap::Parser;
 pub use config::*;
 use ppaass_common::crypto::FileSystemRsaCryptoRepo;
-use ppaass_common::server::{CommonServer, Server, ServerState};
+use ppaass_common::server::{CommonServer, Server, ServerListener, ServerState};
 use ppaass_common::{init_logger, ProxyTcpConnectionPool, ProxyTcpConnectionPoolConfig};
 
+use crate::crypto::ForwardProxyRsaCryptoRepository;
 use crate::tunnel::handle_agent_connection;
 use std::fs::read_to_string;
-
-use crate::crypto::ForwardProxyRsaCryptoRepository;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use ppaass_common::error::CommonError;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::runtime::Builder;
+use tokio_tfo::TfoListener;
 use tracing::{debug, error, trace};
 const USER_AGENT_PUBLIC_KEY: &str = "AgentPublicKey.pem";
 const USER_PROXY_PRIVATE_KEY: &str = "ProxyPrivateKey.pem";
@@ -28,6 +29,34 @@ const FORWARD_USER_AGENT_PRIVATE_KEY: &str = "AgentPrivateKey.pem";
 const FORWARD_USER_PROXY_PUBLIC_KEY: &str = "ProxyPublicKey.pem";
 
 const DEFAULT_CONFIG_FILE: &str = "resources/config.toml";
+
+async fn create_server_listener(config: Arc<ProxyConfig>) -> Result<ServerListener, CommonError> {
+    if config.ip_v6() {
+        debug!(
+            "Starting server listener with IPv6 on port: {}",
+            config.server_port()
+        );
+        Ok(ServerListener::TfoListener(
+            TfoListener::bind(SocketAddr::new(
+                IpAddr::V6(Ipv6Addr::UNSPECIFIED),
+                config.server_port(),
+            ))
+            .await?,
+        ))
+    } else {
+        debug!(
+            "Starting server listener with IPv4 on port: {}",
+            config.server_port()
+        );
+        Ok(ServerListener::TfoListener(
+            TfoListener::bind(SocketAddr::new(
+                IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+                config.server_port(),
+            ))
+            .await?,
+        ))
+    }
+}
 
 async fn start_server(
     config: Arc<ProxyConfig>,
@@ -62,7 +91,9 @@ async fn start_server(
     }
 
     let server = CommonServer::new(config.clone(), server_state);
-    server.run(handle_agent_connection).await?;
+    server
+        .run(create_server_listener, handle_agent_connection)
+        .await?;
     Ok(())
 }
 fn main() -> Result<(), Box<dyn std::error::Error>> {

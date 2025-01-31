@@ -5,7 +5,7 @@ use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
 
 use crate::crypto::ForwardProxyRsaCryptoRepository;
-use ppaass_common::server::ServerState;
+use ppaass_common::server::{ServerState, ServerTcpStream};
 use ppaass_common::{
     AgentTcpConnection, ProxyTcpConnectionInfoSelector, TunnelInitRequest, TunnelInitResponse,
     UdpRelayDataRequest,
@@ -13,7 +13,6 @@ use ppaass_common::{
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::io::{copy_bidirectional, copy_bidirectional_with_sizes};
-use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio_tfo::TfoStream;
 use tokio_util::io::{SinkWriter, StreamReader};
@@ -184,15 +183,14 @@ impl Tunnel {
 pub async fn handle_agent_connection(
     config: Arc<ProxyConfig>,
     server_state: Arc<ServerState>,
-    agent_tcp_stream: TcpStream,
+    agent_tcp_stream: ServerTcpStream,
     agent_socket_address: SocketAddr,
 ) -> Result<(), CommonError> {
-    let tunnel = Tunnel::new(
-        config,
-        server_state,
-        TfoStream::from(agent_tcp_stream),
-        agent_socket_address,
-    )
-    .await?;
+    let ServerTcpStream::TfoStream(agent_tcp_stream) = agent_tcp_stream else {
+        return Err(CommonError::Other(format!(
+            "Proxy server should use tfo stream: {agent_socket_address}"
+        )));
+    };
+    let tunnel = Tunnel::new(config, server_state, agent_tcp_stream, agent_socket_address).await?;
     tunnel.run().await
 }

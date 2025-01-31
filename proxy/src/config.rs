@@ -10,9 +10,9 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Accessors)]
 pub struct ProxyConfig {
-    #[access(get)]
+    #[access(get(cp))]
     ip_v6: bool,
-    #[access(get)]
+    #[access(get(cp))]
     server_port: u16,
     #[access(get(cp))]
     worker_thread_number: usize,

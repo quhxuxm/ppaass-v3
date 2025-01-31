@@ -3,10 +3,11 @@ use crate::error::CommonError;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::future::Future;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
-use tracing::{debug, error, info};
+use tokio_tfo::{TfoListener, TfoStream};
+use tracing::{error, info};
 
 pub struct ServerState {
     values: HashMap<TypeId, Arc<dyn Any + Send + Sync + 'static>>,
@@ -33,6 +34,43 @@ impl ServerState {
     }
 }
 
+pub enum ServerTcpStream {
+    TcpStream(TcpStream),
+    TfoStream(TfoStream),
+}
+impl ServerTcpStream {
+    pub(crate) fn set_nodelay(&self, val: bool) -> Result<(), CommonError> {
+        match self {
+            ServerTcpStream::TcpStream(stream) => {
+                stream.set_nodelay(val)?;
+                Ok(())
+            }
+            ServerTcpStream::TfoStream(stream) => {
+                stream.set_nodelay(val)?;
+                Ok(())
+            }
+        }
+    }
+}
+pub enum ServerListener {
+    TcpListener(TcpListener),
+    TfoListener(TfoListener),
+}
+
+impl ServerListener {
+    pub async fn accept(&self) -> Result<(ServerTcpStream, SocketAddr), CommonError> {
+        match self {
+            ServerListener::TcpListener(tcp_listener) => {
+                let accept_result = tcp_listener.accept().await?;
+                Ok((ServerTcpStream::TcpStream(accept_result.0), accept_result.1))
+            }
+            ServerListener::TfoListener(tfo_listener) => {
+                let accept_result = tfo_listener.accept().await?;
+                Ok((ServerTcpStream::TfoStream(accept_result.0), accept_result.1))
+            }
+        }
+    }
+}
 #[async_trait::async_trait]
 pub trait Server<C>
 where
@@ -44,39 +82,26 @@ where
 
     fn server_state(&self) -> Arc<ServerState>;
 
-    async fn run<F, Fut>(&self, connection_handler: F) -> Result<(), CommonError>
+    async fn run<F1, Fut1, F2, Fut2>(
+        &self,
+        create_listener: F1,
+        connection_handler: F2,
+    ) -> Result<(), CommonError>
     where
-        F: Fn(Arc<C>, Arc<ServerState>, TcpStream, SocketAddr) -> Fut
+        F1: Fn(Arc<C>) -> Fut1 + Send + Sync + 'static,
+        Fut1: Future<Output = Result<ServerListener, CommonError>> + Send + 'static,
+        F2: Fn(Arc<C>, Arc<ServerState>, ServerTcpStream, SocketAddr) -> Fut2
             + Send
             + Sync
             + Clone
             + 'static,
-        Fut: Future<Output = Result<(), CommonError>> + Send + 'static,
+        Fut2: Future<Output = Result<(), CommonError>> + Send + 'static,
     {
         let config = self.config();
         let server_state = self.server_state();
-        let listener = if config.ip_v6() {
-            debug!(
-                "Starting server listener with IPv6 on port: {}",
-                config.server_port()
-            );
-            TcpListener::bind(SocketAddr::new(
-                IpAddr::V6(Ipv6Addr::UNSPECIFIED),
-                config.server_port(),
-            ))
-            .await?
-        } else {
-            debug!(
-                "Starting server listener with IPv4 on port: {}",
-                config.server_port()
-            );
-            TcpListener::bind(SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-                config.server_port(),
-            ))
-            .await?
-        };
+        let listener = create_listener(config.clone()).await?;
         info!("Server listening on port: {}", config.server_port());
+
         loop {
             let (agent_tcp_stream, agent_socket_address) = match listener.accept().await {
                 Ok(agent_tcp_accept_result) => agent_tcp_accept_result,
@@ -86,7 +111,7 @@ where
                 }
             };
             agent_tcp_stream.set_nodelay(true)?;
-            agent_tcp_stream.set_linger(None)?;
+
             let config = config.clone();
             let server_state = server_state.clone();
             let connection_handler = connection_handler.clone();
