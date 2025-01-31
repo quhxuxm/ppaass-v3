@@ -1,7 +1,8 @@
 use crate::config::AgentConfig;
 
-use ppaass_common::crypto::RsaCryptoRepository;
+use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
+use ppaass_common::server::ServerState;
 use ppaass_common::{
     check_proxy_init_tunnel_response, receive_proxy_tunnel_init_response,
     send_proxy_tunnel_init_request, ProxyTcpConnection, ProxyTcpConnectionInfoSelector,
@@ -18,16 +19,12 @@ use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio_util::io::{SinkWriter, StreamReader};
 use tracing::{debug, error, info};
-pub async fn socks5_protocol_proxy<R>(
+pub async fn socks5_protocol_proxy(
     mut client_tcp_stream: TcpStream,
-    config: Arc<AgentConfig>,
-    rsa_crypto_repo: Arc<R>,
     client_socket_addr: SocketAddr,
-    proxy_tcp_connection_pool: Option<Arc<ProxyTcpConnectionPool<AgentConfig, AgentConfig, R>>>,
-) -> Result<(), CommonError>
-where
-    R: RsaCryptoRepository + Send + Sync + 'static,
-{
+    config: Arc<AgentConfig>,
+    server_state: Arc<ServerState>,
+) -> Result<(), CommonError> {
     debug!("Client connect to agent with socks 5 protocol: {client_socket_addr}");
     let auth_request =
         Socks5HandshakeRequest::retrieve_from_async_stream(&mut client_tcp_stream).await?;
@@ -39,9 +36,15 @@ where
     let init_request =
         Socks5InitRequest::retrieve_from_async_stream(&mut client_tcp_stream).await?;
     debug!("Receive client socks5 handshake init request: {init_request:?}");
+    let rsa_crypto_repo = server_state
+        .get_value::<Arc<FileSystemRsaCryptoRepo>>()
+        .ok_or(CommonError::Other(format!(
+            "Fail to get rsa crypto repository for client: {client_socket_addr}"
+        )))?;
     match init_request.command {
         Socks5InitCommand::Connect => {
             debug!("Receive socks5 CONNECT command: {client_tcp_stream:?}");
+            let proxy_tcp_connection_pool = server_state.get_value::<Arc< ProxyTcpConnectionPool<AgentConfig, AgentConfig, FileSystemRsaCryptoRepo>>>();
             let mut proxy_tcp_connection = match proxy_tcp_connection_pool {
                 None => {
                     ProxyTcpConnection::create(

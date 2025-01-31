@@ -2,9 +2,8 @@ mod client;
 
 use crate::config::AgentConfig;
 pub use client::*;
-use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
-use ppaass_common::ProxyTcpConnectionPool;
+use ppaass_common::server::ServerState;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
@@ -12,16 +11,12 @@ use tracing::{debug, error};
 const SOCKS5_VERSION: u8 = 0x05;
 const SOCKS4_VERSION: u8 = 0x04;
 
-pub async fn handle_client_connection<R>(
+pub async fn handle_client_connection(
     config: Arc<AgentConfig>,
-    rsa_crypto_repo: Arc<R>,
+    server_state: Arc<ServerState>,
     client_tcp_stream: TcpStream,
     client_socket_address: SocketAddr,
-    proxy_tcp_connection_pool: Option<Arc<ProxyTcpConnectionPool<AgentConfig, AgentConfig, R>>>,
-) -> Result<(), CommonError>
-where
-    R: RsaCryptoRepository + Send + Sync + 'static,
-{
+) -> Result<(), CommonError> {
     let client_tcp_stream = client_tcp_stream;
     let client_socket_addr = client_socket_address;
     let mut protocol = [0u8; 1];
@@ -33,36 +28,15 @@ where
     match protocol[0] {
         SOCKS5_VERSION => {
             debug!("Client tcp stream using socks5 protocol: {client_socket_addr}");
-            socks5_protocol_proxy(
-                client_tcp_stream,
-                config,
-                rsa_crypto_repo,
-                client_socket_addr,
-                proxy_tcp_connection_pool,
-            )
-            .await
+            socks5_protocol_proxy(client_tcp_stream, client_socket_addr, config, server_state).await
         }
         SOCKS4_VERSION => {
             debug!("Client tcp stream using socks4 protocol: {client_socket_addr}");
-            socks4_protocol_proxy(
-                client_tcp_stream,
-                config,
-                rsa_crypto_repo,
-                client_socket_addr,
-                proxy_tcp_connection_pool,
-            )
-            .await
+            socks4_protocol_proxy(client_tcp_stream, client_socket_addr, config, server_state).await
         }
         _ => {
             debug!("Client tcp stream using http protocol: {client_socket_addr}");
-            http_protocol_proxy(
-                client_tcp_stream,
-                config,
-                rsa_crypto_repo,
-                client_socket_addr,
-                proxy_tcp_connection_pool,
-            )
-            .await
+            http_protocol_proxy(client_tcp_stream, client_socket_addr, config, server_state).await
         }
     }
 }

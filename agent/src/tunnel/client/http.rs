@@ -7,7 +7,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response};
 use hyper_util::rt::TokioIo;
-use ppaass_common::crypto::RsaCryptoRepository;
+use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
 use ppaass_common::{
     check_proxy_init_tunnel_response, receive_proxy_tunnel_init_response,
@@ -15,6 +15,7 @@ use ppaass_common::{
     ProxyTcpConnectionPool, UnifiedAddress,
 };
 
+use ppaass_common::server::ServerState;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::TcpStream;
@@ -27,16 +28,17 @@ fn success_empty_body() -> BoxBody<Bytes, hyper::Error> {
         .boxed()
 }
 
-async fn client_http_request_handler<R>(
+async fn client_http_request_handler(
     config: &AgentConfig,
-    rsa_crypto_repo: &R,
+    server_state: Arc<ServerState>,
     client_socket_addr: SocketAddr,
     client_http_request: Request<Incoming>,
-    proxy_tcp_connection_pool: Option<Arc<ProxyTcpConnectionPool<AgentConfig, AgentConfig, R>>>,
-) -> Result<Response<BoxBody<Bytes, hyper::Error>>, CommonError>
-where
-    R: RsaCryptoRepository + Send + Sync + 'static,
-{
+) -> Result<Response<BoxBody<Bytes, hyper::Error>>, CommonError> {
+    let rsa_crypto_repo = server_state
+        .get_value::<Arc<FileSystemRsaCryptoRepo>>()
+        .ok_or(CommonError::Other(format!(
+            "Fail to get rsa crypto repository: {client_socket_addr}"
+        )))?;
     let destination_uri = client_http_request.uri();
     let destination_host = destination_uri.host().ok_or(CommonError::Other(format!(
         "Can not find destination host: {destination_uri}, client socket address: {client_socket_addr}"
@@ -54,10 +56,14 @@ where
         }
     };
     debug!("Receive client http request to destination: {destination_address:?}, client socket address: {client_socket_addr}");
+    let proxy_tcp_connection_pool = server_state.get_value::<Arc< ProxyTcpConnectionPool<AgentConfig, AgentConfig, FileSystemRsaCryptoRepo>>>();
     let mut proxy_tcp_connection = match proxy_tcp_connection_pool {
         None => {
-            ProxyTcpConnection::create(config.select_proxy_tcp_connection_info()?, rsa_crypto_repo)
-                .await?
+            ProxyTcpConnection::create(
+                config.select_proxy_tcp_connection_info()?,
+                rsa_crypto_repo.as_ref(),
+            )
+            .await?
         }
         Some(pool) => pool.take_proxy_connection().await?,
     };
@@ -146,28 +152,18 @@ where
     }
 }
 
-pub async fn http_protocol_proxy<R>(
+pub async fn http_protocol_proxy(
     client_tcp_stream: TcpStream,
-    config: Arc<AgentConfig>,
-    rsa_crypto_repo: Arc<R>,
     client_socket_addr: SocketAddr,
-    proxy_tcp_connection_pool: Option<Arc<ProxyTcpConnectionPool<AgentConfig, AgentConfig, R>>>,
-) -> Result<(), CommonError>
-where
-    R: RsaCryptoRepository + Send + Sync + 'static,
-{
+    config: Arc<AgentConfig>,
+    server_state: Arc<ServerState>,
+) -> Result<(), CommonError> {
     let client_tcp_io = TokioIo::new(client_tcp_stream);
     let service_fn = ServiceBuilder::new().service(service_fn(|request| {
-        let proxy_tcp_connection_pool = proxy_tcp_connection_pool.clone();
+        let server_state = server_state.clone();
         async {
-            client_http_request_handler(
-                config.as_ref(),
-                rsa_crypto_repo.as_ref(),
-                client_socket_addr,
-                request,
-                proxy_tcp_connection_pool,
-            )
-            .await
+            client_http_request_handler(config.as_ref(), server_state, client_socket_addr, request)
+                .await
         }
     }));
     http1::Builder::new()

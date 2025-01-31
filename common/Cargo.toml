@@ -22,3 +22,4 @@ tokio-util = { workspace = true, features = ["codec"] }
 futures-util = { workspace = true, features = ["sink"] }
 pretty-hex = { workspace = true }
 concurrent-queue = { workspace = true }
+async-trait = { workspace = true }

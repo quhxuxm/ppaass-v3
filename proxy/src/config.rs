@@ -14,7 +14,7 @@ pub struct ProxyConfig {
     ip_v6: bool,
     #[access(get)]
     server_port: u16,
-    #[access(get)]
+    #[access(get(cp))]
     worker_thread_number: usize,
     #[access(get)]
     log_dir: PathBuf,

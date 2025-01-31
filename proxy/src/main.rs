@@ -2,20 +2,24 @@ mod command;
 mod config;
 mod error;
 
+mod crypto;
 mod tunnel;
 use crate::command::Command;
 use clap::Parser;
 pub use config::*;
 use ppaass_common::crypto::FileSystemRsaCryptoRepo;
-use ppaass_common::init_logger;
-use ppaass_common::server::{CommonServer, Server};
+use ppaass_common::server::{CommonServer, Server, ServerState};
+use ppaass_common::{init_logger, ProxyTcpConnectionPool, ProxyTcpConnectionPoolConfig};
 
 use crate::tunnel::handle_agent_connection;
 use std::fs::read_to_string;
 
+use crate::crypto::ForwardProxyRsaCryptoRepository;
+
+use ppaass_common::error::CommonError;
 use std::path::PathBuf;
 use std::sync::Arc;
-
+use tokio::runtime::Builder;
 use tracing::{debug, error, trace};
 const USER_AGENT_PUBLIC_KEY: &str = "AgentPublicKey.pem";
 const USER_PROXY_PRIVATE_KEY: &str = "ProxyPrivateKey.pem";
@@ -25,6 +29,42 @@ const FORWARD_USER_PROXY_PUBLIC_KEY: &str = "ProxyPublicKey.pem";
 
 const DEFAULT_CONFIG_FILE: &str = "resources/config.toml";
 
+async fn start_server(
+    config: Arc<ProxyConfig>,
+    agent_rsa_crypto_repo: Arc<FileSystemRsaCryptoRepo>,
+) -> Result<(), CommonError> {
+    let mut server_state = ServerState::new();
+    server_state.add_value(agent_rsa_crypto_repo.clone());
+    if config.forward_proxies().is_some() {
+        let forward_rsa_dir = config.forward_rsa_dir().as_ref().ok_or(CommonError::Other(
+            "Fail to get forward rsa dir from configuration".to_string(),
+        ))?;
+        let forward_proxy_rsa_crypto_repo = Arc::new(ForwardProxyRsaCryptoRepository::new(
+            FileSystemRsaCryptoRepo::new(
+                forward_rsa_dir,
+                FORWARD_USER_PROXY_PUBLIC_KEY,
+                FORWARD_USER_AGENT_PRIVATE_KEY,
+            )?,
+        ));
+        trace!(
+            "Success to create forward proxy rsa crypto repo: {forward_proxy_rsa_crypto_repo:?}"
+        );
+        server_state.add_value(forward_proxy_rsa_crypto_repo.clone());
+        if config.max_pool_size().is_some() {
+            let proxy_tcp_connection_pool = ProxyTcpConnectionPool::new(
+                config.clone(),
+                forward_proxy_rsa_crypto_repo.clone(),
+                config.clone(),
+            )
+            .await?;
+            server_state.add_value(Arc::new(proxy_tcp_connection_pool));
+        }
+    }
+
+    let server = CommonServer::new(config.clone(), server_state);
+    server.run(handle_agent_connection).await?;
+    Ok(())
+}
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let command = Command::parse();
     let config_file_path = command
@@ -44,47 +84,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         USER_PROXY_PRIVATE_KEY,
     )?);
     trace!("Success to create agent_rsa crypto repo: {rsa_crypto_repo:?}");
-    let forward_rsa_dir = match command.forward_rsa {
-        None => match config.forward_rsa_dir() {
-            None => None,
-            Some(forward_rsa_dir) => Some(forward_rsa_dir.clone()),
-        },
-        Some(forward_rsa_dir) => Some(forward_rsa_dir),
-    };
-    debug!("Forward agent_rsa directory of the proxy server: {forward_rsa_dir:?}");
-    let forward_rsa_crypto_repo = match forward_rsa_dir {
-        None => None,
-        Some(forward_rsa_dir) => Some(Arc::new(FileSystemRsaCryptoRepo::new(
-            &forward_rsa_dir,
-            FORWARD_USER_PROXY_PUBLIC_KEY,
-            FORWARD_USER_AGENT_PRIVATE_KEY,
-        )?)),
-    };
-    trace!("Success to create forward agent_rsa crypto repo: {rsa_crypto_repo:?}");
-    let server = CommonServer::new(
-        config.clone(),
-        config,
-        rsa_crypto_repo,
-        forward_rsa_crypto_repo.clone(),
-    );
-    if let Err(e) = server.run(
-        move |config,
-              rsa_crypto_repo,
-              agent_tcp_stream,
-              agent_socket_address,
-              forward_proxy_tcp_connection_pool| {
-            let forward_rsa_crypto_repo = forward_rsa_crypto_repo.clone();
-            handle_agent_connection(
-                config,
-                rsa_crypto_repo,
-                forward_rsa_crypto_repo,
-                agent_tcp_stream,
-                agent_socket_address,
-                forward_proxy_tcp_connection_pool,
-            )
-        },
-    ) {
-        error!("Fail to run proxy: {:?}", e);
-    };
+    let runtime = Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(config.worker_thread_number())
+        .build()?;
+    runtime.block_on(async move {
+        if let Err(e) = start_server(config, rsa_crypto_repo).await {
+            error!("Fail to start proxy server: {e:?}")
+        }
+    });
     Ok(())
 }
