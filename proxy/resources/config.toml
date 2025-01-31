@@ -1,6 +1,6 @@
 ip_v6 = false
 server_port = 8080
-worker_thread_number = 64
+worker_thread_number = 256
 log_dir = "log"
 log_name_prefix = "ppaass-proxy-v3"
 max_log_level = "error"
