@@ -59,6 +59,8 @@ impl ProxyTcpConnection {
     {
         let proxy_tcp_stream =
             TcpStream::connect(proxy_tcp_connection_info.proxy_addresses()).await?;
+        proxy_tcp_stream.set_nodelay(true)?;
+        proxy_tcp_stream.set_linger(None)?;
         let proxy_socket_address = proxy_tcp_stream.peer_addr()?;
         let agent_encryption_raw_aes_token = random_32_bytes();
         let rsa_crypto = rsa_crypto_repo

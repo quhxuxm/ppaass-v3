@@ -86,6 +86,8 @@ where
                     continue;
                 }
             };
+            agent_tcp_stream.set_nodelay(true)?;
+            agent_tcp_stream.set_linger(None)?;
             let config = config.clone();
             let server_state = server_state.clone();
             let connection_handler = connection_handler.clone();
