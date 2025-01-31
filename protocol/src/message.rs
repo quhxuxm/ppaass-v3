@@ -1,4 +1,5 @@
 use crate::UnifiedAddress;
+use chrono::NaiveDateTime;
 use serde::{Deserialize, Serialize};
 /// The encryption in Handshake message used to
 /// switch the encryption key
@@ -66,6 +67,16 @@ pub enum TunnelInitFailureReason {
 pub enum TunnelInitResponse {
     Success,
     Failure(TunnelInitFailureReason),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HeartbeatRequest {
+    request_date_time: NaiveDateTime,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct HeartbeatResponse {
+    response_date_time: NaiveDateTime,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

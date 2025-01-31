@@ -7,3 +7,4 @@ edition = "2021"
 serde = { workspace = true, features = ["derive"] }
 thiserror = { workspace = true }
 hex = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
