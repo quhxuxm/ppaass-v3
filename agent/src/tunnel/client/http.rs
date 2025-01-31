@@ -85,6 +85,8 @@ where
         // Note: only after client received an empty body with STATUS_OK can the
         // connection be upgraded, so we can't return a response inside
         // `on_upgrade` future.
+        let agent_to_proxy_data_relay_buffer_size = config.agent_to_proxy_data_relay_buffer_size();
+        let proxy_to_agent_data_relay_buffer_size = config.proxy_to_agent_data_relay_buffer_size();
         tokio::task::spawn(async move {
             match hyper::upgrade::on(client_http_request).await {
                 Err(e) => {
@@ -98,9 +100,11 @@ where
                     let mut upgraded_client_io = TokioIo::new(upgraded_client_io);
 
                     // Proxying data
-                    let (from_client, from_proxy) = match tokio::io::copy_bidirectional(
+                    let (from_client, from_proxy) = match tokio::io::copy_bidirectional_with_sizes(
                         &mut upgraded_client_io,
                         &mut proxy_tcp_connection,
+                        agent_to_proxy_data_relay_buffer_size,
+                        proxy_to_agent_data_relay_buffer_size,
                     )
                     .await
                     {

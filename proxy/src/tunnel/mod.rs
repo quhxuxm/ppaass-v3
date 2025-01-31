@@ -10,7 +10,7 @@ use ppaass_common::{
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::io::copy_bidirectional;
+use tokio::io::{copy_bidirectional, copy_bidirectional_with_sizes};
 use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 
@@ -113,6 +113,7 @@ where
     async fn relay(
         agent_tcp_connection: AgentTcpConnection,
         destination_edge: DestinationEdge,
+        config: &ProxyConfig,
     ) -> Result<(), CommonError> {
         match destination_edge {
             DestinationEdge::Forward(proxy_tcp_connection) => {
@@ -136,9 +137,13 @@ where
                 let destination_tcp_endpoint = StreamReader::new(destination_tcp_endpoint);
                 let mut destination_tcp_connection = SinkWriter::new(destination_tcp_endpoint);
                 debug!("[PROXYING] Going to copy bidirectional between agent [{agent_socket_address}] and destination [{destination_address}]");
-                let (agent_data_size, destination_data_size) =
-                    copy_bidirectional(&mut agent_tcp_connection, &mut destination_tcp_connection)
-                        .await?;
+                let (agent_data_size, destination_data_size) = copy_bidirectional_with_sizes(
+                    &mut agent_tcp_connection,
+                    &mut destination_tcp_connection,
+                    config.proxy_to_destination_data_relay_buffer_size(),
+                    config.destination_to_proxy_data_relay_buffer_size(),
+                )
+                .await?;
                 debug!("[PROXYING] Copy data between agent and destination, agent data size: {agent_data_size}, destination data size: {destination_data_size}");
             }
             DestinationEdge::Udp(destination_udp_endpoint) => {
@@ -179,7 +184,12 @@ where
             self.forward_proxy_tcp_connection_pool,
         )
         .await?;
-        Self::relay(self.agent_tcp_connection, destination_edge).await
+        Self::relay(
+            self.agent_tcp_connection,
+            destination_edge,
+            self.config.as_ref(),
+        )
+        .await
     }
 }
 

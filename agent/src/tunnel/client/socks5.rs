@@ -82,9 +82,11 @@ where
             let mut proxy_tcp_connection = SinkWriter::new(proxy_tcp_connection);
 
             // Proxying data
-            let (from_client, from_proxy) = match tokio::io::copy_bidirectional(
+            let (from_client, from_proxy) = match tokio::io::copy_bidirectional_with_sizes(
                 &mut client_tcp_stream,
                 &mut proxy_tcp_connection,
+                config.agent_to_proxy_data_relay_buffer_size(),
+                config.proxy_to_agent_data_relay_buffer_size(),
             )
             .await
             {

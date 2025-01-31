@@ -6,6 +6,8 @@ log_name_prefix = "ppaass-proxy-v3"
 max_log_level = "error"
 agent_rsa_dir = "resources/agent_rsa"
 forward_rsa_dir = "resources/forward_rsa"
+proxy_to_destination_data_relay_buffer_size = 131072
+destination_to_proxy_data_relay_buffer_size = 131072
 #forward_proxies = [
 #    { proxy_address = "127.0.0.1:10091", proxy_auth = "proxy_forward_user1" },
 #    { proxy_address = "127.0.0.1:10092", proxy_auth = "proxy_forward_user1" },

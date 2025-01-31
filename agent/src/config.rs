@@ -27,6 +27,10 @@ pub struct AgentConfig {
     max_pool_size: Option<usize>,
     fill_interval: Option<u64>,
     connection_retake_interval: Option<u64>,
+    #[access(get(cp))]
+    agent_to_proxy_data_relay_buffer_size: usize,
+    #[access(get(cp))]
+    proxy_to_agent_data_relay_buffer_size: usize,
 }
 
 impl ServerConfig for AgentConfig {

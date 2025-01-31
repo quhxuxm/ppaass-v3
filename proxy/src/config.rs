@@ -32,6 +32,10 @@ pub struct ProxyConfig {
     max_pool_size: Option<usize>,
     fill_interval: Option<u64>,
     connection_retake_interval: Option<u64>,
+    #[access(get(cp))]
+    proxy_to_destination_data_relay_buffer_size: usize,
+    #[access(get(cp))]
+    destination_to_proxy_data_relay_buffer_size: usize,
 }
 
 #[derive(Serialize, Deserialize, Accessors)]

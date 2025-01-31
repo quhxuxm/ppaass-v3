@@ -11,3 +11,5 @@ rsa_dir = "resources/rsa"
 max_pool_size = 32
 fill_interval = 5
 connection_retake_interval = 2
+agent_to_proxy_data_relay_buffer_size = 131072
+proxy_to_agent_data_relay_buffer_size = 131072
