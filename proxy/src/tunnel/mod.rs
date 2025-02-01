@@ -69,8 +69,12 @@ impl Tunnel {
                 keep_alive,
             } => match server_state.get_value::<Arc<ForwardProxyRsaCryptoRepository>>() {
                 None => {
-                    let destination_edge =
-                        DestinationEdge::start_tcp(destination_address, keep_alive).await?;
+                    let destination_edge = DestinationEdge::start_tcp(
+                        destination_address,
+                        keep_alive,
+                        config.destination_connect_timeout(),
+                    )
+                    .await?;
                     let tunnel_init_success_response =
                         bincode::serialize(&TunnelInitResponse::Success)?;
                     agent_tcp_connection

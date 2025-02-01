@@ -1,6 +1,7 @@
 use ppaass_protocol::ProtocolError;
 use std::net::SocketAddr;
 use thiserror::Error;
+use tokio::time::error::Elapsed;
 use tracing::metadata::ParseLevelError;
 #[derive(Error, Debug)]
 
@@ -23,6 +24,8 @@ pub enum CommonError {
     Protocol(#[from] ProtocolError),
     #[error(transparent)]
     Hyper(#[from] hyper::Error),
+    #[error(transparent)]
+    Timeout(#[from] Elapsed),
     #[error("Other comment error happen: {0}")]
     Other(String),
 }

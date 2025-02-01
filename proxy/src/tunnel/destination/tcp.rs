@@ -5,6 +5,8 @@ use ppaass_common::UnifiedAddress;
 use std::net::SocketAddr;
 use std::pin::Pin;
 use std::task::{Context, Poll};
+use std::time::Duration;
+use tokio::time::timeout;
 use tokio_tfo::TfoStream;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{BytesCodec, Framed};
@@ -19,6 +21,7 @@ impl DestinationTcpEndpoint {
     pub async fn connect(
         destination_address: UnifiedAddress,
         _keep_alive: bool,
+        connect_timeout: u64,
     ) -> Result<Self, CommonError> {
         let destination_socks_addrs: Vec<SocketAddr> =
             destination_address.clone().try_into().map_err(|e| {
@@ -26,8 +29,11 @@ impl DestinationTcpEndpoint {
                     "Fail to convert destination address to socket address: {e}"
                 ))
             })?;
-        let destination_tcp_stream =
-            TfoStream::connect(destination_socks_addrs.as_slice()[0]).await?;
+        let destination_tcp_stream = timeout(
+            Duration::from_secs(connect_timeout),
+            TfoStream::connect(destination_socks_addrs.as_slice()[0]),
+        )
+        .await??;
         destination_tcp_stream.set_nodelay(true)?;
         debug!("Connected to destination success: {}", destination_address);
         Ok(DestinationTcpEndpoint {

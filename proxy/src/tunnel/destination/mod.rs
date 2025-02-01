@@ -24,9 +24,11 @@ impl DestinationEdge {
     pub async fn start_tcp(
         destination_address: UnifiedAddress,
         keep_alive: bool,
+        connect_timeout: u64,
     ) -> Result<Self, CommonError> {
         let destination_tcp_connection =
-            DestinationTcpEndpoint::connect(destination_address, keep_alive).await?;
+            DestinationTcpEndpoint::connect(destination_address, keep_alive, connect_timeout)
+                .await?;
         Ok(Self::Tcp(destination_tcp_connection))
     }
 

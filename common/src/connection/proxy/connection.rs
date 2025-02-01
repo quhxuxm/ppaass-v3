@@ -10,6 +10,8 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{ready, Context, Poll};
+use std::time::Duration;
+use tokio::time::timeout;
 use tokio_tfo::TfoStream;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Framed, FramedParts, LengthDelimitedCodec};
@@ -22,6 +24,7 @@ pub struct ProxyTcpConnectionInfo {
     proxy_addresses: Vec<SocketAddr>,
     authentication: String,
     frame_buffer_size: usize,
+    connect_timeout: u64,
 }
 
 impl ProxyTcpConnectionInfo {
@@ -29,11 +32,13 @@ impl ProxyTcpConnectionInfo {
         proxy_addresses: Vec<SocketAddr>,
         authentication: String,
         frame_buffer_size: usize,
+        connect_timeout: u64,
     ) -> Self {
         Self {
             proxy_addresses,
             authentication,
             frame_buffer_size,
+            connect_timeout,
         }
     }
     pub fn authentication(&self) -> &str {
@@ -45,6 +50,10 @@ impl ProxyTcpConnectionInfo {
 
     pub fn frame_buffer_size(&self) -> usize {
         self.frame_buffer_size
+    }
+
+    pub fn connect_timeout(&self) -> u64 {
+        self.connect_timeout
     }
 }
 
@@ -67,8 +76,11 @@ impl ProxyTcpConnection {
     where
         R: RsaCryptoRepository + Sync + Send + 'static,
     {
-        let proxy_tcp_stream =
-            TfoStream::connect(proxy_tcp_connection_info.proxy_addresses()[0]).await?;
+        let proxy_tcp_stream = timeout(
+            Duration::from_secs(proxy_tcp_connection_info.connect_timeout()),
+            TfoStream::connect(proxy_tcp_connection_info.proxy_addresses()[0]),
+        )
+        .await??;
         proxy_tcp_stream.set_nodelay(true)?;
         proxy_tcp_stream.set_linger(None)?;
         let proxy_socket_address = proxy_tcp_stream.peer_addr()?;
