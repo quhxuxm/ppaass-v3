@@ -70,10 +70,10 @@ pub async fn send_proxy_tunnel_init_request(
     proxy_socket_address: SocketAddr,
     destination_address: UnifiedAddress,
 ) -> Result<(), CommonError> {
-    let tunnel_init_request = TunnelInitRequest::Tcp {
+    let tunnel_init_request = TunnelControlRequest::TunnelInit(TunnelInitRequest::Tcp {
         destination_address,
         keep_alive: false,
-    };
+    });
     let tunnel_init_request_bytes = bincode::serialize(&tunnel_init_request)?;
     proxy_tcp_connection
         .send(&tunnel_init_request_bytes)
@@ -85,11 +85,23 @@ pub async fn receive_proxy_tunnel_init_response(
     proxy_tcp_connection: &mut ProxyTcpConnection,
     proxy_socket_address: SocketAddr,
 ) -> Result<TunnelInitResponse, CommonError> {
-    match proxy_tcp_connection.next().await {
-        None => Err(CommonError::ConnectionExhausted(proxy_socket_address)),
-        Some(Err(e)) => Err(e),
-        Some(Ok(tunnel_init_response_bytes)) => {
-            Ok(bincode::deserialize(&tunnel_init_response_bytes)?)
+    loop {
+        match proxy_tcp_connection.next().await {
+            None => return Err(CommonError::ConnectionExhausted(proxy_socket_address)),
+            Some(Err(e)) => return Err(e),
+            Some(Ok(tunnel_init_response_bytes)) => {
+                let tunnel_init_response: TunnelControlResponse =
+                    bincode::deserialize(&tunnel_init_response_bytes)?;
+                match tunnel_init_response {
+                    TunnelControlResponse::Heartbeat(heartbeat_response) => {
+                        debug!("Received heartbeat response: {heartbeat_response:?}");
+                        continue;
+                    }
+                    TunnelControlResponse::TunnelInit(tunnel_init_response) => {
+                        return Ok(tunnel_init_response)
+                    }
+                }
+            }
         }
     }
 }

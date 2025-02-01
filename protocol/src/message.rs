@@ -1,5 +1,5 @@
 use crate::UnifiedAddress;
-use chrono::NaiveDateTime;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 /// The encryption in Handshake message used to
 /// switch the encryption key
@@ -39,6 +39,18 @@ pub struct HandshakeResponse {
     pub encryption: Encryption,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum TunnelControlRequest {
+    Heartbeat(HeartbeatRequest),
+    TunnelInit(TunnelInitRequest),
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub enum TunnelControlResponse {
+    Heartbeat(HeartbeatResponse),
+    TunnelInit(TunnelInitResponse),
+}
+
 /// The tcp destination initialize message used to initialize the destination
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum TunnelInitRequest {
@@ -71,12 +83,36 @@ pub enum TunnelInitResponse {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HeartbeatRequest {
-    request_date_time: NaiveDateTime,
+    request_date_time: DateTime<Utc>,
+}
+
+impl HeartbeatRequest {
+    pub fn new() -> Self {
+        Self {
+            request_date_time: Utc::now(),
+        }
+    }
+
+    pub fn request_date_time(&self) -> &DateTime<Utc> {
+        &self.request_date_time
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct HeartbeatResponse {
-    response_date_time: NaiveDateTime,
+    response_date_time: DateTime<Utc>,
+}
+
+impl HeartbeatResponse {
+    pub fn new() -> Self {
+        Self {
+            response_date_time: Utc::now(),
+        }
+    }
+
+    pub fn response_date_time(&self) -> &DateTime<Utc> {
+        &self.response_date_time
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]

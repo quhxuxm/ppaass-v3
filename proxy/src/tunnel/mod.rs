@@ -7,8 +7,8 @@ use ppaass_common::error::CommonError;
 use crate::crypto::ForwardProxyRsaCryptoRepository;
 use ppaass_common::server::{ServerState, ServerTcpStream};
 use ppaass_common::{
-    AgentTcpConnection, ProxyTcpConnectionInfoSelector, TunnelInitRequest, TunnelInitResponse,
-    UdpRelayDataRequest,
+    AgentTcpConnection, HeartbeatResponse, ProxyTcpConnectionInfoSelector, TunnelControlRequest,
+    TunnelControlResponse, TunnelInitRequest, TunnelInitResponse, UdpRelayDataRequest,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -16,7 +16,7 @@ use tokio::io::{copy_bidirectional, copy_bidirectional_with_sizes};
 use tokio::sync::Mutex;
 use tokio_tfo::TfoStream;
 use tokio_util::io::{SinkWriter, StreamReader};
-use tracing::debug;
+use tracing::{debug, error};
 mod destination;
 
 pub struct Tunnel {
@@ -52,37 +52,50 @@ impl Tunnel {
         })
     }
 
+    async fn heartbeat(
+        agent_tcp_connection: &mut AgentTcpConnection<TfoStream>,
+        agent_socket_address: SocketAddr,
+    ) -> Result<(), CommonError> {
+        let heartbeat_response = TunnelControlResponse::Heartbeat(HeartbeatResponse::new());
+        let heartbeat_response = bincode::serialize(&heartbeat_response)?;
+        if let Err(e) = agent_tcp_connection.send(&heartbeat_response).await {
+            error!(
+                "Failed to send heartbeat response to agent [{agent_socket_address}]: {}",
+                e
+            );
+        };
+        Ok(())
+    }
     async fn initialize_tunnel(
         agent_tcp_connection: &mut AgentTcpConnection<TfoStream>,
+        tunnel_init_request: TunnelInitRequest,
         agent_socket_address: SocketAddr,
         config: &ProxyConfig,
         server_state: &ServerState,
     ) -> Result<DestinationEdge, CommonError> {
-        let agent_data = agent_tcp_connection
-            .next()
-            .await
-            .ok_or(CommonError::ConnectionExhausted(agent_socket_address))??;
-        let tunnel_init_request: TunnelInitRequest = bincode::deserialize(&agent_data)?;
         match tunnel_init_request {
             TunnelInitRequest::Tcp {
                 destination_address,
                 keep_alive,
             } => match server_state.get_value::<Arc<ForwardProxyRsaCryptoRepository>>() {
                 None => {
+                    debug!("[START TCP] Begin to initialize tunnel for agent: {agent_socket_address:?}");
                     let destination_edge = DestinationEdge::start_tcp(
                         destination_address,
                         keep_alive,
                         config.destination_connect_timeout(),
                     )
                     .await?;
-                    let tunnel_init_success_response =
-                        bincode::serialize(&TunnelInitResponse::Success)?;
+                    let tunnel_init_success_response = bincode::serialize(
+                        &TunnelControlResponse::TunnelInit(TunnelInitResponse::Success),
+                    )?;
                     agent_tcp_connection
                         .send(&tunnel_init_success_response)
                         .await?;
                     Ok(destination_edge)
                 }
                 Some(forward_rsa_crypto_repo) => {
+                    debug!("[START FORWARD] Begin to initialize tunnel for agent: {agent_socket_address:?}");
                     let destination_edge = DestinationEdge::start_forward(
                         server_state,
                         config.select_proxy_tcp_connection_info()?,
@@ -98,7 +111,12 @@ impl Tunnel {
                     Ok(destination_edge)
                 }
             },
-            TunnelInitRequest::Udp => Ok(DestinationEdge::start_udp().await?),
+            TunnelInitRequest::Udp => {
+                debug!(
+                    "[START UDP] Begin to initialize tunnel for agent: {agent_socket_address:?}"
+                );
+                Ok(DestinationEdge::start_udp().await?)
+            }
         }
     }
 
@@ -168,19 +186,58 @@ impl Tunnel {
         Ok(())
     }
     pub async fn run(mut self) -> Result<(), CommonError> {
-        let destination_edge = Self::initialize_tunnel(
-            &mut self.agent_tcp_connection,
-            self.agent_socket_address,
-            self.config.as_ref(),
-            self.server_state.as_ref(),
-        )
-        .await?;
-        Self::relay(
-            self.agent_tcp_connection,
-            destination_edge,
-            self.config.as_ref(),
-        )
-        .await
+        loop {
+            match self.agent_tcp_connection.next().await {
+                None => {
+                    error!(
+                        "Agent TCP connection [{}] exhausted.",
+                        self.agent_socket_address
+                    );
+                    return Err(CommonError::ConnectionExhausted(self.agent_socket_address));
+                }
+                Some(Err(e)) => {
+                    error!(
+                        "Read agent TCP connection [{}] error: {:?}",
+                        self.agent_socket_address, e
+                    );
+                    return Err(e);
+                }
+                Some(Ok(agent_message)) => {
+                    let tunnel_ctl_request: TunnelControlRequest =
+                        bincode::deserialize(&agent_message)?;
+                    match tunnel_ctl_request {
+                        TunnelControlRequest::Heartbeat(heartbeat_request) => {
+                            debug!(
+                                "[HEARTBEAT] Heartbeat request received from agent [{}]: {heartbeat_request:?}",
+                                &self.agent_tcp_connection.agent_socket_address()
+                            );
+                            Self::heartbeat(
+                                &mut self.agent_tcp_connection,
+                                self.agent_socket_address,
+                            )
+                            .await?;
+                            continue;
+                        }
+                        TunnelControlRequest::TunnelInit(tunnel_init_request) => {
+                            let destination_edge = Self::initialize_tunnel(
+                                &mut self.agent_tcp_connection,
+                                tunnel_init_request,
+                                self.agent_socket_address,
+                                self.config.as_ref(),
+                                self.server_state.as_ref(),
+                            )
+                            .await?;
+                            return Self::relay(
+                                self.agent_tcp_connection,
+                                destination_edge,
+                                self.config.as_ref(),
+                            )
+                            .await;
+                        }
+                    }
+                }
+            };
+        }
     }
 }
 
