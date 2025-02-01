@@ -57,7 +57,7 @@ async fn start_server(
 ) -> Result<(), CommonError> {
     let mut server_state = ServerState::new();
     server_state.add_value(rsa_crypto_repo.clone());
-    if let Some(_) = config.max_pool_size() {
+    if config.max_pool_size() > 1 {
         let proxy_tcp_connection_pool =
             ProxyTcpConnectionPool::new(config.clone(), rsa_crypto_repo.clone(), config.clone())
                 .await?;

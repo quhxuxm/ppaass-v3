@@ -79,7 +79,7 @@ async fn start_server(
             "Success to create forward proxy rsa crypto repo: {forward_proxy_rsa_crypto_repo:?}"
         );
         server_state.add_value(forward_proxy_rsa_crypto_repo.clone());
-        if config.max_pool_size().is_some() {
+        if config.max_pool_size() > 1 {
             let proxy_tcp_connection_pool = ProxyTcpConnectionPool::new(
                 config.clone(),
                 forward_proxy_rsa_crypto_repo.clone(),
