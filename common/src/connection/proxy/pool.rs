@@ -136,6 +136,10 @@ where
                         filling.clone(),
                     )
                     .await;
+                    sleep(Duration::from_secs(
+                        config.connection_retake_interval().unwrap_or(1),
+                    ))
+                    .await;
                     continue;
                 }
                 Ok(proxy_tcp_connection) => {

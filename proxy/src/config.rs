@@ -27,7 +27,7 @@ pub struct ProxyConfig {
     #[access(get(cp))]
     destination_connect_timeout: u64,
     #[access(get(cp))]
-    forward_proxy_connect_timeout: u64,
+    forward_proxy_connect_timeout: Option<u64>,
     #[access(get)]
     forward_proxies: Option<Vec<ForwardProxyInfo>>,
     #[access(get)]
@@ -87,7 +87,7 @@ impl ProxyTcpConnectionInfoSelector for ProxyConfig {
             proxy_addresses,
             forward_proxy_info.proxy_auth.to_owned(),
             self.forward_proxy_framed_buffer_size().unwrap_or(65536),
-            self.forward_proxy_connect_timeout(),
+            self.forward_proxy_connect_timeout().unwrap_or(120),
         ))
     }
 }
