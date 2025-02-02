@@ -1,7 +1,6 @@
-use crate::connection::codec::{
-    CryptoLengthDelimitedCodec, HandshakeRequestEncoder, HandshakeResponseDecoder,
-};
+use crate::connection::codec::{HandshakeRequestEncoder, HandshakeResponseDecoder};
 
+use crate::connection::CryptoLengthDelimitedFramed;
 use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
 use crate::random_32_bytes;
@@ -24,15 +23,14 @@ use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Framed, FramedParts};
 use tokio_util::io::{SinkWriter, StreamReader};
 use tracing::debug;
-
 pub struct ProxyTcpConnectionNewState {}
 pub struct ProxyTcpConnectionTunnelCtlState {
-    crypto_tcp_framed: CryptoLengthDelimitedCodec<TfoStream>,
+    crypto_tcp_framed: CryptoLengthDelimitedFramed<TfoStream>,
 }
 
 pub struct ProxyTcpConnectionRelayState {
     crypto_tcp_read_write:
-        SinkWriter<StreamReader<CryptoLengthDelimitedCodec<TfoStream>, BytesMut>>,
+        SinkWriter<StreamReader<CryptoLengthDelimitedFramed<TfoStream>, BytesMut>>,
 }
 #[derive(Debug, Clone)]
 pub struct ProxyTcpConnectionInfo {
@@ -147,7 +145,7 @@ impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
         let proxy_socket_address = proxy_tcp_stream.peer_addr()?;
         Ok(ProxyTcpConnection {
             state: ProxyTcpConnectionTunnelCtlState {
-                crypto_tcp_framed: CryptoLengthDelimitedCodec::new(
+                crypto_tcp_framed: CryptoLengthDelimitedFramed::new(
                     proxy_tcp_stream,
                     proxy_encryption,
                     agent_encryption,

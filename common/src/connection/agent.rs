@@ -1,6 +1,5 @@
-use crate::connection::codec::{
-    CryptoLengthDelimitedCodec, HandshakeRequestDecoder, HandshakeResponseEncoder,
-};
+use crate::connection::codec::{HandshakeRequestDecoder, HandshakeResponseEncoder};
+use crate::connection::CryptoLengthDelimitedFramed;
 use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
 use crate::random_32_bytes;
@@ -25,20 +24,20 @@ pub struct AgentTcpConnectionTunnelCtlState<T>
 where
     T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
 {
-    crypto_tcp_framed: CryptoLengthDelimitedCodec<T>,
+    crypto_tcp_framed: CryptoLengthDelimitedFramed<T>,
 }
 pub struct AgentTcpConnectionTcpRelayState<T>
 where
     T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
 {
-    crypto_tcp_read_write: SinkWriter<StreamReader<CryptoLengthDelimitedCodec<T>, BytesMut>>,
+    crypto_tcp_read_write: SinkWriter<StreamReader<CryptoLengthDelimitedFramed<T>, BytesMut>>,
 }
 
 pub struct AgentTcpConnectionUdpRelayState<T>
 where
     T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
 {
-    crypto_tcp_framed: CryptoLengthDelimitedCodec<T>,
+    crypto_tcp_framed: CryptoLengthDelimitedFramed<T>,
 }
 pub struct AgentTcpConnection<S> {
     agent_socket_address: SocketAddr,
@@ -105,7 +104,7 @@ impl AgentTcpConnection<AgentTcpConnectionNewState> {
             agent_socket_address,
             authentication,
             state: AgentTcpConnectionTunnelCtlState {
-                crypto_tcp_framed: CryptoLengthDelimitedCodec::new(
+                crypto_tcp_framed: CryptoLengthDelimitedFramed::new(
                     agent_tcp_stream,
                     agent_encryption,
                     proxy_encryption,
