@@ -189,11 +189,11 @@ impl Tunnel {
         loop {
             match self.agent_tcp_connection.next().await {
                 None => {
-                    error!(
+                    debug!(
                         "Agent TCP connection [{}] exhausted.",
                         self.agent_socket_address
                     );
-                    return Err(CommonError::ConnectionExhausted(self.agent_socket_address));
+                    return Ok(());
                 }
                 Some(Err(e)) => {
                     error!(
