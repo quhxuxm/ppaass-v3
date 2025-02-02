@@ -22,6 +22,8 @@ use std::sync::Arc;
 use tokio::runtime::Builder;
 use tokio_tfo::TfoListener;
 use tracing::{debug, error, trace};
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 const USER_AGENT_PUBLIC_KEY: &str = "AgentPublicKey.pem";
 const USER_PROXY_PRIVATE_KEY: &str = "ProxyPrivateKey.pem";
 

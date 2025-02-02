@@ -21,3 +21,4 @@ tokio-util = { workspace = true, features = ["codec", "io", "io-util"] }
 futures-util = { workspace = true, features = ["sink"] }
 socks5-impl = { workspace = true, features = ["tokio"] }
 tokio-tfo = { workspace = true }
+mimalloc = { workspace = true }

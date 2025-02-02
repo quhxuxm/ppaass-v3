@@ -19,6 +19,9 @@ mod config;
 mod error;
 
 mod tunnel;
+
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 const USER_SERVER_PUBLIC_KEY: &str = "ProxyPublicKey.pem";
 const USER_AGENT_PRIVATE_KEY: &str = "AgentPrivateKey.pem";
 const DEFAULT_CONFIG_FILE: &str = "resources/config.toml";
