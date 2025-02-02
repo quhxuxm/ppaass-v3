@@ -7,3 +7,5 @@ max_log_level = "error"
 agent_rsa_dir = "resources/agent_rsa"
 proxy_to_destination_data_relay_buffer_size = 65536
 destination_to_proxy_data_relay_buffer_size = 65536
+destination_connect_timeout = 10
+agent_framed_buffer_size = 262144

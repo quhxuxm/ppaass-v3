@@ -1,24 +1,39 @@
-use crate::connection::codec::{HandshakeRequestEncoder, HandshakeResponseDecoder};
-use crate::crypto::{decrypt_with_aes, encrypt_with_aes, RsaCryptoRepository};
+use crate::connection::codec::{
+    CryptoLengthDelimitedCodec, HandshakeRequestEncoder, HandshakeResponseDecoder,
+};
+
+use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
 use crate::random_32_bytes;
-use futures_util::stream::{SplitSink, SplitStream};
-use futures_util::{Sink, SinkExt, Stream, StreamExt};
-use ppaass_protocol::{Encryption, HandshakeRequest, HandshakeResponse};
+use futures_util::{SinkExt, StreamExt};
+use ppaass_protocol::{
+    Encryption, HandshakeRequest, HandshakeResponse, HeartbeatRequest, TunnelControlRequest,
+    TunnelControlResponse, TunnelInitFailureReason, TunnelInitRequest, TunnelInitResponse,
+};
 use std::fmt::{Debug, Formatter};
+use std::io::Error;
 use std::net::SocketAddr;
 use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll};
 use std::time::Duration;
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::pin;
 use tokio::time::timeout;
 use tokio_tfo::TfoStream;
 use tokio_util::bytes::BytesMut;
-use tokio_util::codec::{Framed, FramedParts, LengthDelimitedCodec};
-use tracing::{debug, trace};
-pub type ProxyTcpConnectionWrite = SplitSink<ProxyTcpConnection, BytesMut>;
-pub type ProxyTcpConnectionRead = SplitStream<ProxyTcpConnection>;
+use tokio_util::codec::{Framed, FramedParts};
+use tokio_util::io::{SinkWriter, StreamReader};
+use tracing::debug;
 
+pub struct ProxyTcpConnectionNewState {}
+pub struct ProxyTcpConnectionTunnelCtlState {
+    crypto_tcp_framed: CryptoLengthDelimitedCodec<TfoStream>,
+}
+
+pub struct ProxyTcpConnectionRelayState {
+    crypto_tcp_read_write:
+        SinkWriter<StreamReader<CryptoLengthDelimitedCodec<TfoStream>, BytesMut>>,
+}
 #[derive(Debug, Clone)]
 pub struct ProxyTcpConnectionInfo {
     proxy_addresses: Vec<SocketAddr>,
@@ -26,7 +41,6 @@ pub struct ProxyTcpConnectionInfo {
     frame_buffer_size: usize,
     connect_timeout: u64,
 }
-
 impl ProxyTcpConnectionInfo {
     pub fn new(
         proxy_addresses: Vec<SocketAddr>,
@@ -47,32 +61,32 @@ impl ProxyTcpConnectionInfo {
     pub fn proxy_addresses(&self) -> &[SocketAddr] {
         &self.proxy_addresses
     }
-
     pub fn frame_buffer_size(&self) -> usize {
         self.frame_buffer_size
     }
-
     pub fn connect_timeout(&self) -> u64 {
         self.connect_timeout
     }
 }
-
-pub struct ProxyTcpConnection {
-    proxy_tcp_framed: Framed<TfoStream, LengthDelimitedCodec>,
-    agent_encryption: Arc<Encryption>,
-    proxy_encryption: Arc<Encryption>,
+pub struct ProxyTcpConnection<T> {
     proxy_socket_address: SocketAddr,
+    state: T,
 }
-impl Debug for ProxyTcpConnection {
+impl<T> Debug for ProxyTcpConnection<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "ProxyTcpConnection: {}", self.proxy_socket_address)
     }
 }
-impl ProxyTcpConnection {
+impl<T> ProxyTcpConnection<T> {
+    pub fn proxy_socket_address(&self) -> SocketAddr {
+        self.proxy_socket_address
+    }
+}
+impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
     pub async fn create<R>(
         proxy_tcp_connection_info: ProxyTcpConnectionInfo,
         rsa_crypto_repo: &R,
-    ) -> Result<Self, CommonError>
+    ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError>
     where
         R: RsaCryptoRepository + Sync + Send + 'static,
     {
@@ -131,91 +145,125 @@ impl ProxyTcpConnection {
             ..
         } = handshake_response_framed.into_parts();
         let proxy_socket_address = proxy_tcp_stream.peer_addr()?;
-        Ok(Self {
-            proxy_tcp_framed: Framed::with_capacity(
-                proxy_tcp_stream,
-                LengthDelimitedCodec::new(),
-                proxy_tcp_connection_info.frame_buffer_size(),
-            ),
-            agent_encryption: Arc::new(agent_encryption),
-            proxy_encryption: Arc::new(proxy_encryption),
+        Ok(ProxyTcpConnection {
+            state: ProxyTcpConnectionTunnelCtlState {
+                crypto_tcp_framed: CryptoLengthDelimitedCodec::new(
+                    proxy_tcp_stream,
+                    proxy_encryption,
+                    agent_encryption,
+                    proxy_tcp_connection_info.frame_buffer_size(),
+                ),
+            },
             proxy_socket_address,
         })
     }
-
-    pub fn proxy_socket_address(&self) -> SocketAddr {
-        self.proxy_socket_address
-    }
 }
-
-impl Stream for ProxyTcpConnection {
-    type Item = Result<BytesMut, CommonError>;
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let proxy_encryption = self.proxy_encryption.clone();
-        let proxy_data = ready!(self.get_mut().proxy_tcp_framed.poll_next_unpin(cx));
-        match proxy_data {
-            None => Poll::Ready(None),
-            Some(proxy_data) => match proxy_data {
-                Err(e) => Poll::Ready(Some(Err(e.into()))),
-                Ok(proxy_data) => match proxy_encryption.as_ref() {
-                    Encryption::Plain => Poll::Ready(Some(Ok(proxy_data))),
-                    Encryption::Aes(token) => match decrypt_with_aes(&token, &proxy_data) {
-                        Ok(raw_data) => {
-                            trace!(
-                                "Proxy tcp connection receive data:\n{}",
-                                pretty_hex::pretty_hex(&raw_data)
-                            );
-                            Poll::Ready(Some(Ok(BytesMut::from_iter(raw_data))))
+impl ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState> {
+    pub async fn tunnel_init(
+        self,
+        tunnel_init_request: TunnelInitRequest,
+    ) -> Result<ProxyTcpConnection<ProxyTcpConnectionRelayState>, CommonError> {
+        let tunnel_ctl_request = TunnelControlRequest::TunnelInit(tunnel_init_request);
+        let raw_tunnel_ctl_request_bytes = bincode::serialize(&tunnel_ctl_request)?;
+        let mut crypto_tcp_framed = self.state.crypto_tcp_framed;
+        crypto_tcp_framed
+            .send(&raw_tunnel_ctl_request_bytes)
+            .await?;
+        loop {
+            let tunnel_ctl_response_bytes = crypto_tcp_framed
+                .next()
+                .await
+                .ok_or(CommonError::ConnectionExhausted(self.proxy_socket_address))??;
+            let tunnel_ctl_response: TunnelControlResponse =
+                bincode::deserialize(&tunnel_ctl_response_bytes)?;
+            match tunnel_ctl_response {
+                TunnelControlResponse::Heartbeat(heart_beat) => {
+                    debug!("Receive heartbeat response from proxy connection: {heart_beat:?}");
+                    continue;
+                }
+                TunnelControlResponse::TunnelInit(tunnel_init_response) => {
+                    return match tunnel_init_response {
+                        TunnelInitResponse::Success => Ok(ProxyTcpConnection {
+                            proxy_socket_address: self.proxy_socket_address,
+                            state: ProxyTcpConnectionRelayState {
+                                crypto_tcp_read_write: SinkWriter::new(StreamReader::new(
+                                    crypto_tcp_framed,
+                                )),
+                            },
+                        }),
+                        TunnelInitResponse::Failure(TunnelInitFailureReason::AuthenticateFail) => {
+                            Err(CommonError::Other(format!(
+                                "Tunnel init fail on authenticate: {tunnel_init_response:?}",
+                            )))
                         }
-                        Err(e) => Poll::Ready(Some(Err(e.into()))),
-                    },
-                    Encryption::Blowfish(_) => {
-                        todo!()
+                        TunnelInitResponse::Failure(
+                            TunnelInitFailureReason::InitWithDestinationFail,
+                        ) => Err(CommonError::Other(format!(
+                            "Tunnel init fail on connect destination: {tunnel_init_response:?}",
+                        ))),
                     }
-                },
-            },
+                }
+            }
+        }
+    }
+    pub async fn heartbeat(&mut self, timeout_seconds: u64) -> Result<(), CommonError> {
+        let heartbeat_request = TunnelControlRequest::Heartbeat(HeartbeatRequest::new());
+        let raw_tunnel_ctl_request = bincode::serialize(&heartbeat_request)?;
+        self.state
+            .crypto_tcp_framed
+            .send(&raw_tunnel_ctl_request)
+            .await?;
+        let raw_tunnel_ctl_response_bytes = timeout(
+            Duration::from_secs(timeout_seconds),
+            self.state.crypto_tcp_framed.next(),
+        )
+        .await?
+        .ok_or(CommonError::ConnectionExhausted(self.proxy_socket_address))??;
+        let tunnel_ctl_response: TunnelControlResponse =
+            bincode::deserialize(&raw_tunnel_ctl_response_bytes)?;
+        match tunnel_ctl_response {
+            TunnelControlResponse::Heartbeat(heartbeat_response) => {
+                debug!("Receive heartbeat response from proxy connection: {heartbeat_response:?}");
+                Ok(())
+            }
+            TunnelControlResponse::TunnelInit(_) => Err(CommonError::Other(format!(
+                "Receive tunnel init response from proxy connection: {}",
+                self.proxy_socket_address
+            ))),
         }
     }
 }
 
-impl Sink<&[u8]> for ProxyTcpConnection {
-    type Error = CommonError;
-    fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), CommonError>> {
-        self.get_mut()
-            .proxy_tcp_framed
-            .poll_ready_unpin(cx)
-            .map_err(Into::into)
+impl AsyncRead for ProxyTcpConnection<ProxyTcpConnectionRelayState> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        let crypto_tcp_read_write = &mut self.get_mut().state.crypto_tcp_read_write;
+        pin!(crypto_tcp_read_write);
+        crypto_tcp_read_write.poll_read(cx, buf)
     }
+}
 
-    fn start_send(self: Pin<&mut Self>, item: &[u8]) -> Result<(), CommonError> {
-        let item = match self.agent_encryption.as_ref() {
-            Encryption::Plain => BytesMut::from(item),
-            Encryption::Aes(token) => {
-                trace!(
-                    "Proxy tcp connection send data:\n{}",
-                    pretty_hex::pretty_hex(&item)
-                );
-                BytesMut::from_iter(encrypt_with_aes(token, &item)?)
-            }
-            Encryption::Blowfish(_) => {
-                todo!()
-            }
-        };
-        self.get_mut()
-            .proxy_tcp_framed
-            .start_send_unpin(item.freeze())
-            .map_err(Into::into)
+impl AsyncWrite for ProxyTcpConnection<ProxyTcpConnectionRelayState> {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, Error>> {
+        let crypto_tcp_read_write = &mut self.get_mut().state.crypto_tcp_read_write;
+        pin!(crypto_tcp_read_write);
+        crypto_tcp_read_write.poll_write(cx, buf)
     }
-    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), CommonError>> {
-        self.get_mut()
-            .proxy_tcp_framed
-            .poll_flush_unpin(cx)
-            .map_err(Into::into)
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        let crypto_tcp_read_write = &mut self.get_mut().state.crypto_tcp_read_write;
+        pin!(crypto_tcp_read_write);
+        crypto_tcp_read_write.poll_flush(cx)
     }
-    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), CommonError>> {
-        self.get_mut()
-            .proxy_tcp_framed
-            .poll_close_unpin(cx)
-            .map_err(Into::into)
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        let crypto_tcp_read_write = &mut self.get_mut().state.crypto_tcp_read_write;
+        pin!(crypto_tcp_read_write);
+        crypto_tcp_read_write.poll_shutdown(cx)
     }
 }

@@ -10,16 +10,14 @@ use hyper_util::rt::TokioIo;
 use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
 use ppaass_common::{
-    check_proxy_init_tunnel_response, receive_proxy_tunnel_init_response,
-    send_proxy_tunnel_init_request, ProxyTcpConnection, ProxyTcpConnectionInfoSelector,
-    ProxyTcpConnectionPool, UnifiedAddress,
+    ProxyTcpConnection, ProxyTcpConnectionInfoSelector, ProxyTcpConnectionPool, TunnelInitRequest,
+    UnifiedAddress,
 };
 
 use ppaass_common::server::ServerState;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio_tfo::TfoStream;
-use tokio_util::io::{SinkWriter, StreamReader};
 use tower::ServiceBuilder;
 use tracing::{debug, error, info};
 fn success_empty_body() -> BoxBody<Bytes, hyper::Error> {
@@ -57,7 +55,7 @@ async fn client_http_request_handler(
     };
     debug!("Receive client http request to destination: {destination_address:?}, client socket address: {client_socket_addr}");
     let proxy_tcp_connection_pool = server_state.get_value::<Arc< ProxyTcpConnectionPool<AgentConfig, AgentConfig, FileSystemRsaCryptoRepo>>>();
-    let mut proxy_tcp_connection = match proxy_tcp_connection_pool {
+    let proxy_tcp_connection = match proxy_tcp_connection_pool {
         None => {
             ProxyTcpConnection::create(
                 config.select_proxy_tcp_connection_info()?,
@@ -68,15 +66,14 @@ async fn client_http_request_handler(
         Some(pool) => pool.take_proxy_connection().await?,
     };
     let proxy_socket_address = proxy_tcp_connection.proxy_socket_address();
-    send_proxy_tunnel_init_request(
-        &mut proxy_tcp_connection,
-        proxy_socket_address,
-        destination_address.clone(),
-    )
-    .await?;
-    let tunnel_init_response =
-        receive_proxy_tunnel_init_response(&mut proxy_tcp_connection, proxy_socket_address).await?;
-    check_proxy_init_tunnel_response(tunnel_init_response)?;
+    debug!("Going to initialize tunnel with proxy: {proxy_socket_address}");
+    let mut proxy_tcp_connection = proxy_tcp_connection
+        .tunnel_init(TunnelInitRequest::Tcp {
+            destination_address,
+            keep_alive: false,
+        })
+        .await?;
+
     if Method::CONNECT == client_http_request.method() {
         // Received an HTTP request like:
         // ```
@@ -101,10 +98,7 @@ async fn client_http_request_handler(
                 }
                 Ok(upgraded_client_io) => {
                     // Connect to remote server
-                    let proxy_tcp_connection = StreamReader::new(proxy_tcp_connection);
-                    let mut proxy_tcp_connection = SinkWriter::new(proxy_tcp_connection);
                     let mut upgraded_client_io = TokioIo::new(upgraded_client_io);
-
                     // Proxying data
                     let (from_client, from_proxy) = match tokio::io::copy_bidirectional_with_sizes(
                         &mut upgraded_client_io,
@@ -131,8 +125,6 @@ async fn client_http_request_handler(
         });
         Ok(Response::new(success_empty_body()))
     } else {
-        let proxy_tcp_connection = StreamReader::new(proxy_tcp_connection);
-        let proxy_tcp_connection = SinkWriter::new(proxy_tcp_connection);
         let proxy_tcp_connection = TokioIo::new(proxy_tcp_connection);
         let (mut proxy_tcp_connection_sender, proxy_tcp_connection_obj) = Builder::new()
             .preserve_header_case(true)

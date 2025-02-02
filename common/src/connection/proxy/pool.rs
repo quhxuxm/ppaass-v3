@@ -1,16 +1,14 @@
 use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
-use crate::{ProxyTcpConnection, ProxyTcpConnectionInfo};
+use crate::{ProxyTcpConnection, ProxyTcpConnectionInfo, ProxyTcpConnectionTunnelCtlState};
 use chrono::{DateTime, Utc};
 use concurrent_queue::{ConcurrentQueue, PopError, PushError};
-use futures_util::{SinkExt, StreamExt};
-use ppaass_protocol::{HeartbeatRequest, TunnelControlRequest, TunnelControlResponse};
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::channel;
-use tokio::time::{sleep, timeout};
+use tokio::time::sleep;
 use tracing::{debug, error};
 
 pub trait ProxyTcpConnectionInfoSelector {
@@ -30,7 +28,7 @@ pub struct ProxyTcpConnectionPoolElement<C>
 where
     C: ProxyTcpConnectionPoolConfig + Debug + Send + Sync + 'static,
 {
-    proxy_tcp_connection: ProxyTcpConnection,
+    proxy_tcp_connection: ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>,
     create_time: DateTime<Utc>,
     last_check_time: DateTime<Utc>,
     config: Arc<C>,
@@ -39,7 +37,10 @@ impl<C> ProxyTcpConnectionPoolElement<C>
 where
     C: ProxyTcpConnectionPoolConfig + Debug + Send + Sync + 'static,
 {
-    pub fn new(proxy_tcp_connection: ProxyTcpConnection, config: Arc<C>) -> Self {
+    pub fn new(
+        proxy_tcp_connection: ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>,
+        config: Arc<C>,
+    ) -> Self {
         Self {
             proxy_tcp_connection,
             last_check_time: Utc::now(),
@@ -121,7 +122,9 @@ where
             proxy_tcp_connection_info_selector,
         })
     }
-    pub async fn take_proxy_connection(&self) -> Result<ProxyTcpConnection, CommonError> {
+    pub async fn take_proxy_connection(
+        &self,
+    ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
         Self::concrete_take_proxy_connection(
             self.pool.clone(),
             self.config.clone(),
@@ -137,50 +140,10 @@ where
         config: &C,
     ) -> Result<(), CommonError> {
         debug!("Checking proxy connection : {proxy_tcp_connection_pool_element:?}");
-
-        let heartbeat_request_bytes =
-            bincode::serialize(&TunnelControlRequest::Heartbeat(HeartbeatRequest::new()))?;
         proxy_tcp_connection_pool_element
             .proxy_tcp_connection
-            .send(&heartbeat_request_bytes)
-            .await?;
-        let heartbeat_response_bytes = match timeout(
-            Duration::from_secs(config.heartbeat_timeout()),
-            proxy_tcp_connection_pool_element
-                .proxy_tcp_connection
-                .next(),
-        )
-        .await
-        {
-            Err(_) => {
-                return Err(CommonError::Other(format!(
-                    "Proxy connection heartbeat timeout: {proxy_tcp_connection_pool_element:?}"
-                )));
-            }
-            Ok(None) => {
-                return Err(CommonError::Other(format!(
-                    "Proxy connection closed: {proxy_tcp_connection_pool_element:?}"
-                )));
-            }
-
-            Ok(Some(Err(e))) => {
-                error!("Fail to receive heartbeat response from proxy: {e:?}");
-                return Err(e);
-            }
-            Ok(Some(Ok(heartbeat_response_bytes))) => heartbeat_response_bytes,
-        };
-        let tunnel_ctl_response: TunnelControlResponse =
-            bincode::deserialize(&heartbeat_response_bytes)?;
-        match tunnel_ctl_response {
-            TunnelControlResponse::Heartbeat(heartbeat)=>{
-                proxy_tcp_connection_pool_element.last_check_time=Utc::now();
-                debug!("Receive heartbeat response for proxy connection : {proxy_tcp_connection_pool_element:?}, heartbeat: {heartbeat:?}");
-                Ok(())
-            }
-            TunnelControlResponse::TunnelInit(_)=>{
-                Err(CommonError::Other(format!("Receive tunnel initialization response in heartbeat: {proxy_tcp_connection_pool_element:?}")))
-            }
-        }
+            .heartbeat(config.heartbeat_timeout())
+            .await
     }
     fn start_connection_check_task(
         config: Arc<C>,
@@ -275,7 +238,7 @@ where
         rsa_crypto_repo: Arc<R>,
         proxy_tcp_connection_info_selector: Arc<S>,
         filling: Arc<AtomicBool>,
-    ) -> Result<ProxyTcpConnection, CommonError> {
+    ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
         loop {
             let pool = pool.clone();
             let current_pool_size = pool.len();
@@ -336,7 +299,7 @@ where
             debug!("Begin to fill proxy connection pool");
             filling.store(true, Ordering::Relaxed);
             let (proxy_tcp_connection_tx, mut proxy_tcp_connection_rx) =
-                channel::<ProxyTcpConnection>(max_pool_size);
+                channel::<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>>(max_pool_size);
             let current_pool_size = pool.len();
             debug!("Current pool size: {current_pool_size}");
             for _ in current_pool_size..max_pool_size {

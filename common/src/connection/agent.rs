@@ -1,42 +1,64 @@
-use crate::connection::codec::{HandshakeRequestDecoder, HandshakeResponseEncoder};
-use crate::crypto::{decrypt_with_aes, encrypt_with_aes, RsaCryptoRepository};
+use crate::connection::codec::{
+    CryptoLengthDelimitedCodec, HandshakeRequestDecoder, HandshakeResponseEncoder,
+};
+use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
 use crate::random_32_bytes;
-use futures_util::stream::{SplitSink, SplitStream};
 use futures_util::{Sink, StreamExt};
 use futures_util::{SinkExt, Stream};
-use ppaass_protocol::{Encryption, HandshakeRequest, HandshakeResponse};
+use ppaass_protocol::{
+    Encryption, HandshakeRequest, HandshakeResponse, HeartbeatResponse, TunnelControlRequest,
+    TunnelControlResponse, TunnelInitRequest, TunnelInitResponse,
+};
+use std::io::Error;
 use std::net::SocketAddr;
 use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{ready, Context, Poll};
-use tokio::io::{AsyncRead, AsyncWrite};
+use std::task::{Context, Poll};
+use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::pin;
 use tokio_util::bytes::BytesMut;
-use tokio_util::codec::{Framed, FramedParts, LengthDelimitedCodec};
-use tracing::trace;
-pub type AgentTcpConnectionWrite<T> = SplitSink<AgentTcpConnection<T>, BytesMut>;
-pub type AgentTcpConnectionRead<T> = SplitStream<AgentTcpConnection<T>>;
-pub struct AgentTcpConnection<T>
+use tokio_util::codec::{Framed, FramedParts};
+use tokio_util::io::{SinkWriter, StreamReader};
+use tracing::debug;
+pub struct AgentTcpConnectionNewState {}
+pub struct AgentTcpConnectionTunnelCtlState<T>
 where
     T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
 {
-    agent_tcp_framed: Framed<T, LengthDelimitedCodec>,
-    agent_socket_address: SocketAddr,
-    authentication: String,
-    agent_encryption: Arc<Encryption>,
-    proxy_encryption: Arc<Encryption>,
+    crypto_tcp_framed: CryptoLengthDelimitedCodec<T>,
+}
+pub struct AgentTcpConnectionTcpRelayState<T>
+where
+    T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
+{
+    crypto_tcp_read_write: SinkWriter<StreamReader<CryptoLengthDelimitedCodec<T>, BytesMut>>,
 }
 
-impl<T> AgentTcpConnection<T>
+pub struct AgentTcpConnectionUdpRelayState<T>
 where
     T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
 {
-    pub async fn create<R>(
+    crypto_tcp_framed: CryptoLengthDelimitedCodec<T>,
+}
+pub struct AgentTcpConnection<S> {
+    agent_socket_address: SocketAddr,
+    authentication: String,
+    state: S,
+}
+impl<S> AgentTcpConnection<S> {
+    pub fn agent_socket_address(&self) -> SocketAddr {
+        self.agent_socket_address
+    }
+}
+impl AgentTcpConnection<AgentTcpConnectionNewState> {
+    pub async fn create<T, R>(
         agent_tcp_stream: T,
         agent_socket_address: SocketAddr,
         rsa_crypto_repo: &R,
-    ) -> Result<Self, CommonError>
+        frame_buffer_size: usize,
+    ) -> Result<AgentTcpConnection<AgentTcpConnectionTunnelCtlState<T>>, CommonError>
     where
+        T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
         R: RsaCryptoRepository + Sync + Send + 'static,
     {
         let mut handshake_request_framed =
@@ -48,7 +70,6 @@ where
             .next()
             .await
             .ok_or(CommonError::ConnectionExhausted(agent_socket_address))??;
-
         let rsa_crypto = rsa_crypto_repo
             .get_rsa_crypto(&authentication)?
             .ok_or(CommonError::RsaCryptoNotFound(authentication.clone()))?;
@@ -80,96 +101,165 @@ where
             io: agent_tcp_stream,
             ..
         } = handshake_response_framed.into_parts();
-
-        Ok(Self {
-            agent_tcp_framed: Framed::new(agent_tcp_stream, LengthDelimitedCodec::new()),
+        Ok(AgentTcpConnection {
             agent_socket_address,
             authentication,
-            agent_encryption: Arc::new(agent_encryption),
-            proxy_encryption: Arc::new(proxy_encryption),
+            state: AgentTcpConnectionTunnelCtlState {
+                crypto_tcp_framed: CryptoLengthDelimitedCodec::new(
+                    agent_tcp_stream,
+                    agent_encryption,
+                    proxy_encryption,
+                    frame_buffer_size,
+                ),
+            },
         })
     }
-    pub fn agent_socket_address(&self) -> SocketAddr {
-        self.agent_socket_address
+}
+impl<T> AgentTcpConnection<AgentTcpConnectionTunnelCtlState<T>>
+where
+    T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
+{
+    pub async fn wait_tunnel_init(&mut self) -> Result<TunnelInitRequest, CommonError> {
+        loop {
+            let tunnel_ctl_request_bytes = self
+                .state
+                .crypto_tcp_framed
+                .next()
+                .await
+                .ok_or(CommonError::ConnectionExhausted(self.agent_socket_address))??;
+            let tunnel_ctl_request: TunnelControlRequest =
+                bincode::deserialize(&tunnel_ctl_request_bytes)?;
+            match tunnel_ctl_request {
+                TunnelControlRequest::Heartbeat(heartbeat_request) => {
+                    debug!("Receive heartbeat request from agent connection [{}]: {heartbeat_request:?}", self.agent_socket_address);
+                    let heartbeat_response =
+                        TunnelControlResponse::Heartbeat(HeartbeatResponse::new());
+                    let heartbeat_response_bytes = bincode::serialize(&heartbeat_response)?;
+                    self.state
+                        .crypto_tcp_framed
+                        .send(&heartbeat_response_bytes)
+                        .await?;
+                    continue;
+                }
+                TunnelControlRequest::TunnelInit(tunnel_init_request) => {
+                    return Ok(tunnel_init_request)
+                }
+            }
+        }
+    }
+
+    pub async fn response_tcp_tunnel_init(
+        mut self,
+        tunnel_init_response: TunnelInitResponse,
+    ) -> Result<AgentTcpConnection<AgentTcpConnectionTcpRelayState<T>>, CommonError> {
+        let tunnel_ctl_response = TunnelControlResponse::TunnelInit(tunnel_init_response);
+        let tunnel_ctl_response_bytes = bincode::serialize(&tunnel_ctl_response)?;
+        self.state
+            .crypto_tcp_framed
+            .send(&tunnel_ctl_response_bytes)
+            .await?;
+        Ok(AgentTcpConnection {
+            agent_socket_address: self.agent_socket_address,
+            authentication: self.authentication,
+            state: AgentTcpConnectionTcpRelayState {
+                crypto_tcp_read_write: SinkWriter::new(StreamReader::new(
+                    self.state.crypto_tcp_framed,
+                )),
+            },
+        })
+    }
+
+    pub async fn response_udp_tunnel_init(
+        mut self,
+        tunnel_init_response: TunnelInitResponse,
+    ) -> Result<AgentTcpConnection<AgentTcpConnectionUdpRelayState<T>>, CommonError> {
+        let tunnel_ctl_response = TunnelControlResponse::TunnelInit(tunnel_init_response);
+        let tunnel_ctl_response_bytes = bincode::serialize(&tunnel_ctl_response)?;
+        self.state
+            .crypto_tcp_framed
+            .send(&tunnel_ctl_response_bytes)
+            .await?;
+        Ok(AgentTcpConnection {
+            agent_socket_address: self.agent_socket_address,
+            authentication: self.authentication,
+            state: AgentTcpConnectionUdpRelayState {
+                crypto_tcp_framed: self.state.crypto_tcp_framed,
+            },
+        })
     }
 }
-
-impl<T> Stream for AgentTcpConnection<T>
+impl<T> AsyncRead for AgentTcpConnection<AgentTcpConnectionTcpRelayState<T>>
+where
+    T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
+{
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<std::io::Result<()>> {
+        let crypto_tcp_read_write = &mut self.get_mut().state.crypto_tcp_read_write;
+        pin!(crypto_tcp_read_write);
+        crypto_tcp_read_write.poll_read(cx, buf)
+    }
+}
+impl<T> AsyncWrite for AgentTcpConnection<AgentTcpConnectionTcpRelayState<T>>
+where
+    T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
+{
+    fn poll_write(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &[u8],
+    ) -> Poll<Result<usize, Error>> {
+        let crypto_tcp_read_write = &mut self.get_mut().state.crypto_tcp_read_write;
+        pin!(crypto_tcp_read_write);
+        crypto_tcp_read_write.poll_write(cx, buf)
+    }
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        let crypto_tcp_read_write = &mut self.get_mut().state.crypto_tcp_read_write;
+        pin!(crypto_tcp_read_write);
+        crypto_tcp_read_write.poll_flush(cx)
+    }
+    fn poll_shutdown(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        let crypto_tcp_read_write = &mut self.get_mut().state.crypto_tcp_read_write;
+        pin!(crypto_tcp_read_write);
+        crypto_tcp_read_write.poll_shutdown(cx)
+    }
+}
+impl<T> Stream for AgentTcpConnection<AgentTcpConnectionUdpRelayState<T>>
 where
     T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
 {
     type Item = Result<BytesMut, CommonError>;
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let agent_encryption = self.agent_encryption.clone();
-        let authentication = self.authentication.clone();
-        let agent_data = ready!(self.get_mut().agent_tcp_framed.poll_next_unpin(cx));
-        match agent_data {
-            None => Poll::Ready(None),
-            Some(agent_data) => match agent_data {
-                Err(e) => Poll::Ready(Some(Err(e.into()))),
-                Ok(agent_data) => match agent_encryption.as_ref() {
-                    Encryption::Plain => Poll::Ready(Some(Ok(agent_data))),
-                    Encryption::Aes(token) => match decrypt_with_aes(&token, &agent_data) {
-                        Ok(raw_data) => {
-                            trace!(
-                                "Agent tcp connection from [{authentication}] receive data:\n{}",
-                                pretty_hex::pretty_hex(&raw_data)
-                            );
-                            Poll::Ready(Some(Ok(BytesMut::from_iter(raw_data))))
-                        }
-                        Err(e) => Poll::Ready(Some(Err(e.into()))),
-                    },
-                    Encryption::Blowfish(_) => {
-                        todo!()
-                    }
-                },
-            },
-        }
+        let crypto_tcp_framed = &mut self.get_mut().state.crypto_tcp_framed;
+        pin!(crypto_tcp_framed);
+        crypto_tcp_framed.poll_next(cx)
     }
 }
-
-impl<T> Sink<&[u8]> for AgentTcpConnection<T>
+impl<T> Sink<BytesMut> for AgentTcpConnection<AgentTcpConnectionUdpRelayState<T>>
 where
     T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
 {
     type Error = CommonError;
     fn poll_ready(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.get_mut()
-            .agent_tcp_framed
-            .poll_ready_unpin(cx)
-            .map_err(Into::into)
+        let crypto_tcp_framed = &mut self.get_mut().state.crypto_tcp_framed;
+        pin!(crypto_tcp_framed);
+        crypto_tcp_framed.poll_ready(cx)
     }
-
-    fn start_send(self: Pin<&mut Self>, item: &[u8]) -> Result<(), Self::Error> {
-        let authentication = self.authentication.clone();
-        let item = match self.proxy_encryption.as_ref() {
-            Encryption::Plain => BytesMut::from(item),
-            Encryption::Aes(token) => {
-                trace!(
-                    "Agent tcp connection from [{authentication}] send data:\n{}",
-                    pretty_hex::pretty_hex(&item)
-                );
-                BytesMut::from_iter(encrypt_with_aes(token, item)?)
-            }
-            Encryption::Blowfish(_) => {
-                todo!()
-            }
-        };
-        self.get_mut()
-            .agent_tcp_framed
-            .start_send_unpin(item.freeze())
-            .map_err(Into::into)
+    fn start_send(self: Pin<&mut Self>, item: BytesMut) -> Result<(), Self::Error> {
+        let crypto_tcp_framed = &mut self.get_mut().state.crypto_tcp_framed;
+        pin!(crypto_tcp_framed);
+        crypto_tcp_framed.start_send(&item)
     }
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.get_mut()
-            .agent_tcp_framed
-            .poll_flush_unpin(cx)
-            .map_err(Into::into)
+        let crypto_tcp_framed = &mut self.get_mut().state.crypto_tcp_framed;
+        pin!(crypto_tcp_framed);
+        crypto_tcp_framed.poll_flush(cx)
     }
     fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        self.get_mut()
-            .agent_tcp_framed
-            .poll_close_unpin(cx)
-            .map_err(Into::into)
+        let crypto_tcp_framed = &mut self.get_mut().state.crypto_tcp_framed;
+        pin!(crypto_tcp_framed);
+        crypto_tcp_framed.poll_close(cx)
     }
 }

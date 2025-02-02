@@ -2,12 +2,15 @@ use futures_util::SinkExt;
 
 use ppaass_common::error::CommonError;
 
-use ppaass_common::{AgentTcpConnection, UdpRelayDataResponse, UnifiedAddress};
+use ppaass_common::{
+    AgentTcpConnection, AgentTcpConnectionUdpRelayState, UdpRelayDataResponse, UnifiedAddress,
+};
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
 use tokio::net::UdpSocket;
 use tokio::sync::Mutex;
 use tokio_tfo::TfoStream;
+use tokio_util::bytes::BytesMut;
 use tracing::error;
 #[derive(Clone)]
 pub struct DestinationUdpEndpoint {}
@@ -19,7 +22,9 @@ impl DestinationUdpEndpoint {
 
     pub async fn replay(
         &self,
-        agent_tcp_connection: Arc<Mutex<AgentTcpConnection<TfoStream>>>,
+        agent_tcp_connection: Arc<
+            Mutex<AgentTcpConnection<AgentTcpConnectionUdpRelayState<TfoStream>>>,
+        >,
         data: &[u8],
         source_address: UnifiedAddress,
         destination_address: UnifiedAddress,
@@ -60,7 +65,7 @@ impl DestinationUdpEndpoint {
             };
             let mut agent_tcp_connection_write = agent_tcp_connection.lock().await;
             if let Err(e) = agent_tcp_connection_write
-                .send(&udp_relay_data_response_bytes)
+                .send(BytesMut::from_iter(udp_relay_data_response_bytes))
                 .await
             {
                 error!(

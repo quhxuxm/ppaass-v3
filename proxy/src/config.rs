@@ -27,6 +27,8 @@ pub struct ProxyConfig {
     #[access(get(cp))]
     destination_connect_timeout: u64,
     #[access(get(cp))]
+    agent_framed_buffer_size: usize,
+    #[access(get(cp))]
     forward_proxy_connect_timeout: Option<u64>,
     #[access(get)]
     forward_proxies: Option<Vec<ForwardProxyInfo>>,

@@ -18,7 +18,7 @@ tracing-appender = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 bincode = { workspace = true }
 hyper = { workspace = true }
-tokio-util = { workspace = true, features = ["codec"] }
+tokio-util = { workspace = true, features = ["codec", "io", "io-util"] }
 futures-util = { workspace = true, features = ["sink"] }
 pretty-hex = { workspace = true }
 concurrent-queue = { workspace = true }

@@ -6,9 +6,8 @@ use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
 use ppaass_common::{
-    check_proxy_init_tunnel_response, receive_proxy_tunnel_init_response,
-    send_proxy_tunnel_init_request, ProxyTcpConnection, ProxyTcpConnectionInfo,
-    ProxyTcpConnectionPool, UnifiedAddress,
+    ProxyTcpConnection, ProxyTcpConnectionInfo, ProxyTcpConnectionPool,
+    ProxyTcpConnectionRelayState, TunnelInitRequest, UnifiedAddress,
 };
 use std::sync::Arc;
 pub use tcp::*;
@@ -16,7 +15,7 @@ use tracing::debug;
 pub use udp::*;
 pub enum DestinationEdge {
     Tcp(DestinationTcpEndpoint),
-    Forward(ProxyTcpConnection),
+    Forward(ProxyTcpConnection<ProxyTcpConnectionRelayState>),
     Udp(DestinationUdpEndpoint),
 }
 
@@ -41,7 +40,7 @@ impl DestinationEdge {
     where
         T: RsaCryptoRepository + Send + Sync + 'static,
     {
-        let mut proxy_tcp_connection =
+        let proxy_tcp_connection =
             match server_state.get_value::<Arc<
                 ProxyTcpConnectionPool<ProxyConfig, ProxyConfig, ForwardProxyRsaCryptoRepository>,
             >>() {
@@ -53,18 +52,13 @@ impl DestinationEdge {
             };
         let proxy_socket_address = proxy_tcp_connection.proxy_socket_address();
         debug!("Success to create forward proxy tcp connection: {proxy_socket_address}");
-        send_proxy_tunnel_init_request(
-            &mut proxy_tcp_connection,
-            proxy_socket_address,
-            destination_address.clone(),
-        )
-        .await?;
+        let proxy_tcp_connection = proxy_tcp_connection
+            .tunnel_init(TunnelInitRequest::Tcp {
+                destination_address: destination_address.clone(),
+                keep_alive: false,
+            })
+            .await?;
         debug!("Success to send init tunnel request on forward proxy tcp connection: {proxy_socket_address}, destination address: {destination_address:?}");
-        let tunnel_init_response =
-            receive_proxy_tunnel_init_response(&mut proxy_tcp_connection, proxy_socket_address)
-                .await?;
-        debug!("Success to receive init tunnel response on forward proxy tcp connection: {proxy_socket_address}, response: {tunnel_init_response:?}");
-        check_proxy_init_tunnel_response(tunnel_init_response)?;
         Ok(Self::Forward(proxy_tcp_connection))
     }
 

@@ -4,9 +4,8 @@ use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
 use ppaass_common::{
-    check_proxy_init_tunnel_response, receive_proxy_tunnel_init_response,
-    send_proxy_tunnel_init_request, ProxyTcpConnection, ProxyTcpConnectionInfoSelector,
-    ProxyTcpConnectionPool, UnifiedAddress,
+    ProxyTcpConnection, ProxyTcpConnectionInfoSelector, ProxyTcpConnectionPool, TunnelInitRequest,
+    UnifiedAddress,
 };
 use socks5_impl::protocol::handshake::Request as Socks5HandshakeRequest;
 use socks5_impl::protocol::handshake::Response as Socks5HandshakeResponse;
@@ -17,7 +16,6 @@ use socks5_impl::protocol::{
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio_tfo::TfoStream;
-use tokio_util::io::{SinkWriter, StreamReader};
 use tracing::{debug, error, info};
 pub async fn socks5_protocol_proxy(
     mut client_tcp_stream: TfoStream,
@@ -45,7 +43,7 @@ pub async fn socks5_protocol_proxy(
         Socks5InitCommand::Connect => {
             debug!("Receive socks5 CONNECT command: {client_socket_addr}");
             let proxy_tcp_connection_pool = server_state.get_value::<Arc< ProxyTcpConnectionPool<AgentConfig, AgentConfig, FileSystemRsaCryptoRepo>>>();
-            let mut proxy_tcp_connection = match proxy_tcp_connection_pool {
+            let proxy_tcp_connection = match proxy_tcp_connection_pool {
                 None => {
                     ProxyTcpConnection::create(
                         config.select_proxy_tcp_connection_info()?,
@@ -64,25 +62,20 @@ pub async fn socks5_protocol_proxy(
                     port: *port,
                 },
             };
-            send_proxy_tunnel_init_request(
-                &mut proxy_tcp_connection,
-                proxy_socket_address,
-                destination_address.clone(),
-            )
-            .await?;
-            let tunnel_init_response =
-                receive_proxy_tunnel_init_response(&mut proxy_tcp_connection, proxy_socket_address)
-                    .await?;
-            check_proxy_init_tunnel_response(tunnel_init_response)?;
+
+            let mut proxy_tcp_connection = proxy_tcp_connection
+                .tunnel_init(TunnelInitRequest::Tcp {
+                    destination_address,
+                    keep_alive: false,
+                })
+                .await?;
+
             debug!("Socks5 client tunnel init success with remote: {proxy_socket_address:?}");
             let init_response = Socks5InitResponse::new(Reply::Succeeded, init_request.address);
             init_response
                 .write_to_async_stream(&mut client_tcp_stream)
                 .await?;
             debug!("Socks5 client tunnel init success begin to relay, : {proxy_socket_address:?}");
-
-            let proxy_tcp_connection = StreamReader::new(proxy_tcp_connection);
-            let mut proxy_tcp_connection = SinkWriter::new(proxy_tcp_connection);
 
             // Proxying data
             let (from_client, from_proxy) = match tokio::io::copy_bidirectional_with_sizes(
