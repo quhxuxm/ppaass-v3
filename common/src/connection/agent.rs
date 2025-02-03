@@ -100,7 +100,6 @@ impl AgentTcpConnection<AgentTcpConnectionNewState> {
         Ok(AgentTcpConnection {
             agent_socket_address,
             authentication,
-
             frame_buffer_size,
             state: AgentTcpConnectionTunnelCtlState {
                 proxy_encryption: proxy_encryption.clone(),
