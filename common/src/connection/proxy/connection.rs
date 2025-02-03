@@ -5,7 +5,8 @@ use crate::connection::codec::{
 use crate::connection::CryptoLengthDelimitedFramed;
 use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
-use crate::random_32_bytes;
+
+use crate::{random_generate_encryption, rsa_decrypt_encryption, rsa_encrypt_encryption};
 use futures_util::{SinkExt, StreamExt};
 use ppaass_protocol::{
     Encryption, HandshakeRequest, HandshakeResponse, HeartbeatRequest, TunnelControlRequest,
@@ -102,20 +103,18 @@ impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
         proxy_tcp_stream.set_nodelay(true)?;
         proxy_tcp_stream.set_linger(None)?;
         let proxy_socket_address = proxy_tcp_stream.peer_addr()?;
-        let agent_encryption_raw_aes_token = random_32_bytes();
+        let agent_encryption = random_generate_encryption();
         let rsa_crypto = rsa_crypto_repo
             .get_rsa_crypto(proxy_tcp_connection_info.authentication())?
             .ok_or(CommonError::RsaCryptoNotFound(
                 proxy_tcp_connection_info.authentication().to_owned(),
             ))?;
-        let encrypt_agent_encryption_aes_token =
-            rsa_crypto.encrypt(&agent_encryption_raw_aes_token)?;
-        let encrypt_agent_encryption = Encryption::Aes(encrypt_agent_encryption_aes_token);
+        let encrypt_agent_encryption = rsa_encrypt_encryption(&agent_encryption, &rsa_crypto)?;
         let mut handshake_request_framed =
             Framed::new(proxy_tcp_stream, HandshakeRequestEncoder::new());
         let handshake_request = HandshakeRequest {
             authentication: proxy_tcp_connection_info.authentication().to_owned(),
-            encryption: encrypt_agent_encryption,
+            encryption: encrypt_agent_encryption.into_owned(),
         };
         debug!("Begin to send handshake request to proxy: {handshake_request:?}");
         handshake_request_framed.send(handshake_request).await?;
@@ -134,16 +133,7 @@ impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
             .await
             .ok_or(CommonError::ConnectionExhausted(proxy_socket_address))??;
         debug!("Success to receive handshake response from proxy: {proxy_socket_address:?}");
-        let agent_encryption = Encryption::Aes(agent_encryption_raw_aes_token);
-        let proxy_encryption = match proxy_encryption {
-            Encryption::Plain => proxy_encryption,
-            Encryption::Aes(encrypted_token) => {
-                Encryption::Aes(rsa_crypto.decrypt(&encrypted_token)?)
-            }
-            Encryption::Blowfish(encrypted_token) => {
-                Encryption::Blowfish(rsa_crypto.encrypt(&encrypted_token)?)
-            }
-        };
+        let proxy_encryption = rsa_decrypt_encryption(&proxy_encryption, &rsa_crypto)?.into_owned();
         let FramedParts {
             io: proxy_tcp_stream,
             ..

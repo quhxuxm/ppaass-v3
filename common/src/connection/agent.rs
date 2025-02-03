@@ -4,7 +4,7 @@ use crate::connection::codec::{
 use crate::connection::CryptoLengthDelimitedFramed;
 use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
-use crate::random_32_bytes;
+use crate::{random_generate_encryption, rsa_decrypt_encryption, rsa_encrypt_encryption};
 use futures_util::{Sink, StreamExt};
 use futures_util::{SinkExt, Stream};
 use ppaass_protocol::{
@@ -78,22 +78,11 @@ impl AgentTcpConnection<AgentTcpConnectionNewState> {
         let rsa_crypto = rsa_crypto_repo
             .get_rsa_crypto(&authentication)?
             .ok_or(CommonError::RsaCryptoNotFound(authentication.clone()))?;
-        let agent_encryption = match encryption {
-            Encryption::Plain => encryption,
-            Encryption::Aes(token) => {
-                let decrypted_token = rsa_crypto.decrypt(&token)?;
-                Encryption::Aes(decrypted_token)
-            }
-            Encryption::Blowfish(token) => {
-                let decrypted_token = rsa_crypto.decrypt(&token)?;
-                Encryption::Blowfish(decrypted_token)
-            }
-        };
-        let raw_proxy_encryption_token = random_32_bytes();
-        let encrypted_proxy_encryption_token = rsa_crypto.encrypt(&raw_proxy_encryption_token)?;
-        let proxy_encryption = Encryption::Aes(raw_proxy_encryption_token);
+        let agent_encryption = rsa_decrypt_encryption(&encryption, &rsa_crypto)?.into_owned();
+        let proxy_encryption = random_generate_encryption();
+        let encrypted_proxy_encryption = rsa_encrypt_encryption(&proxy_encryption, &rsa_crypto)?;
         let handshake_response = HandshakeResponse {
-            encryption: Encryption::Aes(encrypted_proxy_encryption_token),
+            encryption: encrypted_proxy_encryption.into_owned(),
         };
         let FramedParts {
             io: agent_tcp_stream,

@@ -3,10 +3,12 @@ mod connection;
 pub mod crypto;
 pub mod error;
 pub mod server;
+use crate::crypto::{generate_aes_encryption_token, generate_blowfish_encryption_token, RsaCrypto};
 use crate::error::CommonError;
 pub use connection::*;
 pub use ppaass_protocol::*;
 use rand::random;
+use std::borrow::Cow;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::Path;
 use std::str::FromStr;
@@ -19,10 +21,48 @@ pub fn generate_uuid() -> String {
     Uuid::new_v4().to_string().replace("-", "").to_uppercase()
 }
 
-/// Generate a random 32 bytes vector
-pub fn random_32_bytes() -> Vec<u8> {
-    let random_32_bytes = random::<[u8; 32]>();
-    random_32_bytes.to_vec()
+/// Randomly generate a raw encryption
+pub fn random_generate_encryption() -> Encryption {
+    let random_number = random::<u64>();
+    if random_number % 2 == 0 {
+        Encryption::Aes(generate_aes_encryption_token())
+    } else {
+        Encryption::Blowfish(generate_blowfish_encryption_token())
+    }
+}
+
+pub fn rsa_encrypt_encryption<'a>(
+    raw_encryption: &'a Encryption,
+    rsa_crypto: &RsaCrypto,
+) -> Result<Cow<'a, Encryption>, CommonError> {
+    match raw_encryption {
+        Encryption::Plain => Ok(Cow::Borrowed(raw_encryption)),
+        Encryption::Aes(token) => {
+            let encrypted_token = rsa_crypto.encrypt(&token)?;
+            Ok(Cow::Owned(Encryption::Aes(encrypted_token)))
+        }
+        Encryption::Blowfish(token) => {
+            let encrypted_token = rsa_crypto.encrypt(&token)?;
+            Ok(Cow::Owned(Encryption::Blowfish(encrypted_token)))
+        }
+    }
+}
+
+pub fn rsa_decrypt_encryption<'a>(
+    encrypted_encryption: &'a Encryption,
+    rsa_crypto: &RsaCrypto,
+) -> Result<Cow<'a, Encryption>, CommonError> {
+    match encrypted_encryption {
+        Encryption::Plain => Ok(Cow::Borrowed(encrypted_encryption)),
+        Encryption::Aes(token) => {
+            let decrypted_token = rsa_crypto.decrypt(&token)?;
+            Ok(Cow::Owned(Encryption::Aes(decrypted_token)))
+        }
+        Encryption::Blowfish(token) => {
+            let decrypted_token = rsa_crypto.decrypt(&token)?;
+            Ok(Cow::Owned(Encryption::Blowfish(decrypted_token)))
+        }
+    }
 }
 
 /// Init the logger

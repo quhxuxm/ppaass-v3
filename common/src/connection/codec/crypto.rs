@@ -1,4 +1,6 @@
-use crate::crypto::{decrypt_with_aes, encrypt_with_aes};
+use crate::crypto::{
+    decrypt_with_aes, decrypt_with_blowfish, encrypt_with_aes, encrypt_with_blowfish,
+};
 use crate::error::CommonError;
 use ppaass_protocol::Encryption;
 use std::sync::Arc;
@@ -34,8 +36,9 @@ impl Decoder for CryptoLengthDelimitedCodec {
                     let raw_bytes = decrypt_with_aes(&token, &decrypted_bytes)?;
                     Ok(Some(BytesMut::from(&raw_bytes[..])))
                 }
-                Encryption::Blowfish(_) => {
-                    unimplemented!("Blowfish still not implemented yet");
+                Encryption::Blowfish(token) => {
+                    let raw_bytes = decrypt_with_blowfish(&token, &decrypted_bytes)?;
+                    Ok(Some(BytesMut::from(&raw_bytes[..])))
                 }
             },
         }
@@ -51,8 +54,9 @@ impl Encoder<Bytes> for CryptoLengthDelimitedCodec {
                 let encrypted_bytes = encrypt_with_aes(token, &item)?;
                 Ok(self.length_delimited.encode(encrypted_bytes.into(), dst)?)
             }
-            Encryption::Blowfish(_) => {
-                unimplemented!("Blowfish still not implemented yet");
+            Encryption::Blowfish(token) => {
+                let encrypted_bytes = encrypt_with_blowfish(token, &item)?;
+                Ok(self.length_delimited.encode(encrypted_bytes.into(), dst)?)
             }
         }
     }

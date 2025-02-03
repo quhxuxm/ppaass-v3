@@ -10,6 +10,7 @@ rand = { workspace = true }
 rand_core = { workspace = true }
 thiserror = { workspace = true }
 aes = { workspace = true }
+blowfish = { workspace = true }
 rsa = { workspace = true, features = ["getrandom"] }
 cipher = { workspace = true, features = ["block-padding", "alloc"] }
 tracing = { workspace = true }

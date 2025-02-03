@@ -1,11 +1,12 @@
 use crate::error::CommonError;
-use crate::random_32_bytes;
+
+use crate::crypto::random_n_bytes;
 use aes::Aes256;
 use cipher::block_padding::Pkcs7;
 use cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
 /// Generate the encryption token for AES
-pub fn generate_aes_encryption_token() -> Vec<u8> {
-    random_32_bytes()
+pub(crate) fn generate_aes_encryption_token() -> Vec<u8> {
+    random_n_bytes::<32>()
 }
 
 /// Encrypt the target bytes with AES

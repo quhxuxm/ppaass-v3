@@ -1,13 +1,22 @@
 mod aes;
+mod blowfish;
 mod rsa;
 use crate::error::CommonError;
 pub use aes::*;
+pub use blowfish::*;
+use rand::random;
 pub use rsa::*;
 use std::collections::HashMap;
 use std::fs::{read_dir, File};
 use std::path::Path;
 use std::sync::Arc;
 use tracing::error;
+
+fn random_n_bytes<const N: usize>() -> Vec<u8> {
+    let random_n_bytes = random::<[u8; N]>();
+    random_n_bytes.to_vec()
+}
+
 pub trait RsaCryptoRepository {
     fn get_rsa_crypto(&self, key: &str) -> Result<Option<Arc<RsaCrypto>>, CommonError>;
 }
