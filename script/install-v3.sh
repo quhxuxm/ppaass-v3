@@ -50,6 +50,7 @@ sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/* /ppaass-v3/build/re
 sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/agent_rsa/* /ppaass-v3/build/resources/agent_rsa
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/proxy /ppaass-v3/build/ppaass-v3-proxy
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/script/start-proxy.sh /ppaass-v3/build/
+sudo cp /ppaass-v3/sourcecode/ppaass-v3/script/concrete-start-proxy.sh /ppaass-v3/build/
 
 sudo chmod 777 /ppaass-v3/build
 cd /ppaass-v3/build
@@ -58,9 +59,10 @@ ls -l
 sudo chmod 777 ppaass-v3-proxy
 sudo chmod 777 *.sh
 sudo dos2unix ./start-proxy.sh
+sudo dos2unix ./concrete-start-proxy.sh
 
 #Start with the low configuration by default
-sudo nohup ./start-proxy.sh >run.log 2>&1 &
+sudo ./start-proxy.sh
 
 ulimit -n 409600
 
