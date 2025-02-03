@@ -1,4 +1,4 @@
-use crate::config::{AgentConfig, ConnectionPoolConfig};
+use crate::config::AgentConfig;
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty};
 use hyper::body::{Bytes, Incoming};
@@ -14,6 +14,7 @@ use ppaass_common::{
     UnifiedAddress,
 };
 
+use ppaass_common::config::ConnectionPoolConfig;
 use ppaass_common::server::ServerState;
 use std::net::SocketAddr;
 use std::sync::Arc;

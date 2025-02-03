@@ -1,9 +1,8 @@
 use accessory::Accessors;
-use ppaass_common::config::ServerConfig;
+use ppaass_common::config::{ConnectionPoolConfig, ServerConfig};
 use ppaass_common::error::CommonError;
 use ppaass_common::{
     parse_to_socket_addresses, ProxyTcpConnectionInfo, ProxyTcpConnectionInfoSelector,
-    ProxyTcpConnectionPoolConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -45,37 +44,6 @@ impl ServerConfig for AgentConfig {
     }
     fn ip_v6(&self) -> bool {
         self.ip_v6
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Accessors, Clone)]
-pub struct ConnectionPoolConfig {
-    max_pool_size: usize,
-    fill_interval: u64,
-    connection_retake_interval: u64,
-    check_interval: u64,
-    connection_max_alive: i64,
-    heartbeat_timeout: u64,
-}
-
-impl ProxyTcpConnectionPoolConfig for ConnectionPoolConfig {
-    fn max_pool_size(&self) -> usize {
-        self.max_pool_size
-    }
-    fn fill_interval(&self) -> u64 {
-        self.fill_interval
-    }
-    fn connection_retake_interval(&self) -> u64 {
-        self.connection_retake_interval
-    }
-    fn check_interval(&self) -> u64 {
-        self.check_interval
-    }
-    fn connection_max_alive(&self) -> i64 {
-        self.connection_max_alive
-    }
-    fn heartbeat_timeout(&self) -> u64 {
-        self.heartbeat_timeout
     }
 }
 

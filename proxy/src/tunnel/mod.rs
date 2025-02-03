@@ -63,7 +63,7 @@ impl Tunnel {
             TunnelInitRequest::Tcp {
                 destination_address,
                 keep_alive,
-            } => match server_state.get_value::<Arc<ForwardProxyRsaCryptoRepository>>() {
+            } => match config.forward() {
                 None => {
                     debug!("[START TCP] Begin to initialize tunnel for agent: {agent_socket_address:?}");
                     let destination_edge = DestinationEdge::start_tcp(
@@ -72,14 +72,14 @@ impl Tunnel {
                         config.destination_connect_timeout(),
                     )
                     .await?;
-
                     Ok(destination_edge)
                 }
-                Some(forward_rsa_crypto_repo) => {
+                Some(forward_config) => {
                     debug!("[START FORWARD] Begin to initialize tunnel for agent: {agent_socket_address:?}");
+                    let forward_rsa_crypto_repo=server_state.get_value::<Arc<ForwardProxyRsaCryptoRepository>>().ok_or(CommonError::Other("Proxy configured as forward but no forward rsa crypto repository configured.".to_string()))?;
                     let destination_edge = DestinationEdge::start_forward(
                         server_state,
-                        config.select_proxy_tcp_connection_info()?,
+                        forward_config.select_proxy_tcp_connection_info()?,
                         forward_rsa_crypto_repo.as_ref(),
                         destination_address,
                     )

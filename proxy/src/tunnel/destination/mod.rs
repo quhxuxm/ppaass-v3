@@ -1,7 +1,8 @@
 mod tcp;
 mod udp;
 use crate::crypto::ForwardProxyRsaCryptoRepository;
-use crate::ProxyConfig;
+use crate::ForwardConfig;
+use ppaass_common::config::ConnectionPoolConfig;
 use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
@@ -40,16 +41,19 @@ impl DestinationEdge {
     where
         T: RsaCryptoRepository + Send + Sync + 'static,
     {
-        let proxy_tcp_connection =
-            match server_state.get_value::<Arc<
-                ProxyTcpConnectionPool<ProxyConfig, ProxyConfig, ForwardProxyRsaCryptoRepository>,
-            >>() {
-                None => {
-                    ProxyTcpConnection::create(proxy_tcp_connection_info, forward_rsa_crypto_repo)
-                        .await?
-                }
-                Some(pool) => pool.take_proxy_connection().await?,
-            };
+        let proxy_tcp_connection = match server_state.get_value::<Arc<
+            ProxyTcpConnectionPool<
+                ConnectionPoolConfig,
+                ForwardConfig,
+                ForwardProxyRsaCryptoRepository,
+            >,
+        >>() {
+            None => {
+                ProxyTcpConnection::create(proxy_tcp_connection_info, forward_rsa_crypto_repo)
+                    .await?
+            }
+            Some(pool) => pool.take_proxy_connection().await?,
+        };
         let proxy_socket_address = proxy_tcp_connection.proxy_socket_address();
         debug!("Success to create forward proxy tcp connection: {proxy_socket_address}");
         let proxy_tcp_connection = proxy_tcp_connection

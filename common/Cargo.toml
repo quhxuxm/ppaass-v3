@@ -25,3 +25,4 @@ concurrent-queue = { workspace = true }
 async-trait = { workspace = true }
 tokio-tfo = { workspace = true }
 chrono = { workspace = true }
+serde = { workspace = true }

@@ -1,5 +1,6 @@
-use crate::config::{AgentConfig, ConnectionPoolConfig};
+use crate::config::AgentConfig;
 
+use ppaass_common::config::ConnectionPoolConfig;
 use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;

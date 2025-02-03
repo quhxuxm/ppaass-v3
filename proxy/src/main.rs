@@ -9,7 +9,7 @@ use clap::Parser;
 pub use config::*;
 use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::server::{CommonServer, Server, ServerListener, ServerState};
-use ppaass_common::{init_logger, ProxyTcpConnectionPool, ProxyTcpConnectionPoolConfig};
+use ppaass_common::{init_logger, ProxyTcpConnectionPool};
 
 use crate::crypto::ForwardProxyRsaCryptoRepository;
 use crate::tunnel::handle_agent_connection;
@@ -66,10 +66,8 @@ async fn start_server(
 ) -> Result<(), CommonError> {
     let mut server_state = ServerState::new();
     server_state.add_value(agent_rsa_crypto_repo.clone());
-    if config.forward_proxies().is_some() {
-        let forward_rsa_dir = config.forward_rsa_dir().as_ref().ok_or(CommonError::Other(
-            "Fail to get forward rsa dir from configuration".to_string(),
-        ))?;
+    if let Some(forward_config) = config.forward() {
+        let forward_rsa_dir = forward_config.rsa_dir();
         let forward_proxy_rsa_crypto_repo = Arc::new(ForwardProxyRsaCryptoRepository::new(
             FileSystemRsaCryptoRepo::new(
                 forward_rsa_dir,
@@ -81,11 +79,11 @@ async fn start_server(
             "Success to create forward proxy rsa crypto repo: {forward_proxy_rsa_crypto_repo:?}"
         );
         server_state.add_value(forward_proxy_rsa_crypto_repo.clone());
-        if config.max_pool_size() > 1 {
+        if let Some(connection_pool_config) = forward_config.connection_pool() {
             let proxy_tcp_connection_pool = ProxyTcpConnectionPool::new(
-                config.clone(),
+                Arc::new(connection_pool_config.clone()),
                 forward_proxy_rsa_crypto_repo.clone(),
-                config.clone(),
+                Arc::new(forward_config.clone()),
             )
             .await?;
             server_state.add_value(Arc::new(proxy_tcp_connection_pool));
