@@ -1,4 +1,4 @@
-use crate::config::AgentConfig;
+use crate::config::{AgentConfig, ConnectionPoolConfig};
 
 use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
@@ -42,7 +42,9 @@ pub async fn socks5_protocol_proxy(
     match init_request.command {
         Socks5InitCommand::Connect => {
             debug!("Receive socks5 CONNECT command: {client_socket_addr}");
-            let proxy_tcp_connection_pool = server_state.get_value::<Arc< ProxyTcpConnectionPool<AgentConfig, AgentConfig, FileSystemRsaCryptoRepo>>>();
+            let proxy_tcp_connection_pool = server_state.get_value::<Arc<
+                ProxyTcpConnectionPool<ConnectionPoolConfig, AgentConfig, FileSystemRsaCryptoRepo>,
+            >>();
             let proxy_tcp_connection = match proxy_tcp_connection_pool {
                 None => {
                     ProxyTcpConnection::create(

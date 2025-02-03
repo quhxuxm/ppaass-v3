@@ -1,4 +1,4 @@
-use crate::config::AgentConfig;
+use crate::config::{AgentConfig, ConnectionPoolConfig};
 use http_body_util::combinators::BoxBody;
 use http_body_util::{BodyExt, Empty};
 use hyper::body::{Bytes, Incoming};
@@ -54,7 +54,7 @@ async fn client_http_request_handler(
         }
     };
     debug!("Receive client http request to destination: {destination_address:?}, client socket address: {client_socket_addr}");
-    let proxy_tcp_connection_pool = server_state.get_value::<Arc< ProxyTcpConnectionPool<AgentConfig, AgentConfig, FileSystemRsaCryptoRepo>>>();
+    let proxy_tcp_connection_pool = server_state.get_value::<Arc< ProxyTcpConnectionPool<ConnectionPoolConfig, AgentConfig, FileSystemRsaCryptoRepo>>>();
     let proxy_tcp_connection = match proxy_tcp_connection_pool {
         None => {
             ProxyTcpConnection::create(

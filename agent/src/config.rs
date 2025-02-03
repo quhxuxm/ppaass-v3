@@ -24,12 +24,6 @@ pub struct AgentConfig {
     proxy_addresses: Vec<String>,
     #[access(get(ty=&str))]
     authentication: String,
-    max_pool_size: Option<usize>,
-    fill_interval: Option<u64>,
-    connection_retake_interval: Option<u64>,
-    check_interval: Option<u64>,
-    connection_max_alive: Option<i64>,
-    heartbeat_timeout: Option<u64>,
     #[access(get(cp))]
     agent_to_proxy_data_relay_buffer_size: usize,
     #[access(get(cp))]
@@ -38,6 +32,8 @@ pub struct AgentConfig {
     proxy_framed_buffer_size: usize,
     #[access(get(cp))]
     proxy_connect_timeout: u64,
+    #[access(get)]
+    connection_pool: Option<ConnectionPoolConfig>,
 }
 
 impl ServerConfig for AgentConfig {
@@ -52,24 +48,34 @@ impl ServerConfig for AgentConfig {
     }
 }
 
-impl ProxyTcpConnectionPoolConfig for AgentConfig {
+#[derive(Serialize, Deserialize, Debug, Accessors, Clone)]
+pub struct ConnectionPoolConfig {
+    max_pool_size: usize,
+    fill_interval: u64,
+    connection_retake_interval: u64,
+    check_interval: u64,
+    connection_max_alive: i64,
+    heartbeat_timeout: u64,
+}
+
+impl ProxyTcpConnectionPoolConfig for ConnectionPoolConfig {
     fn max_pool_size(&self) -> usize {
-        self.max_pool_size.unwrap_or(1)
+        self.max_pool_size
     }
     fn fill_interval(&self) -> u64 {
-        self.fill_interval.unwrap_or(10)
+        self.fill_interval
     }
     fn connection_retake_interval(&self) -> u64 {
-        self.connection_retake_interval.unwrap_or(1)
+        self.connection_retake_interval
     }
     fn check_interval(&self) -> u64 {
-        self.check_interval.unwrap_or(10)
+        self.check_interval
     }
     fn connection_max_alive(&self) -> i64 {
-        self.connection_max_alive.unwrap_or(300)
+        self.connection_max_alive
     }
     fn heartbeat_timeout(&self) -> u64 {
-        self.heartbeat_timeout.unwrap_or(10)
+        self.heartbeat_timeout
     }
 }
 

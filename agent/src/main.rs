@@ -6,7 +6,7 @@ use ppaass_common::config::ServerConfig;
 use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::{CommonServer, Server, ServerListener, ServerState};
-use ppaass_common::{init_logger, ProxyTcpConnectionPool, ProxyTcpConnectionPoolConfig};
+use ppaass_common::{init_logger, ProxyTcpConnectionPool};
 use std::fs::read_to_string;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
@@ -60,10 +60,13 @@ async fn start_server(
 ) -> Result<(), CommonError> {
     let mut server_state = ServerState::new();
     server_state.add_value(rsa_crypto_repo.clone());
-    if config.max_pool_size() > 1 {
-        let proxy_tcp_connection_pool =
-            ProxyTcpConnectionPool::new(config.clone(), rsa_crypto_repo.clone(), config.clone())
-                .await?;
+    if let Some(connection_pool_config) = config.connection_pool() {
+        let proxy_tcp_connection_pool = ProxyTcpConnectionPool::new(
+            Arc::new(connection_pool_config.clone()),
+            rsa_crypto_repo.clone(),
+            config.clone(),
+        )
+        .await?;
         server_state.add_value(Arc::new(proxy_tcp_connection_pool));
     }
     let server = CommonServer::new(config.clone(), server_state);
