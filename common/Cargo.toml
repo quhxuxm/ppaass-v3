@@ -20,7 +20,6 @@ bincode = { workspace = true }
 hyper = { workspace = true }
 tokio-util = { workspace = true, features = ["codec", "io", "io-util"] }
 futures-util = { workspace = true, features = ["sink"] }
-pretty-hex = { workspace = true }
 concurrent-queue = { workspace = true }
 async-trait = { workspace = true }
 tokio-tfo = { workspace = true }

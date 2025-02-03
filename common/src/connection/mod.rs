@@ -28,17 +28,14 @@ where
 {
     pub fn new(
         tcp_stream: T,
-        decoder_encryption: Encryption,
-        encoder_encryption: Encryption,
+        decoder_encryption: Arc<Encryption>,
+        encoder_encryption: Arc<Encryption>,
         frame_buffer_size: usize,
     ) -> Self {
         Self {
             crypto_length_delimited_framed: Framed::with_capacity(
                 tcp_stream,
-                CryptoLengthDelimitedCodec::new(
-                    Arc::new(decoder_encryption),
-                    Arc::new(encoder_encryption),
-                ),
+                CryptoLengthDelimitedCodec::new(decoder_encryption, encoder_encryption),
                 frame_buffer_size,
             ),
         }

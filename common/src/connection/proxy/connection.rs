@@ -1,4 +1,6 @@
-use crate::connection::codec::{HandshakeRequestEncoder, HandshakeResponseDecoder};
+use crate::connection::codec::{
+    HandshakeRequestEncoder, HandshakeResponseDecoder, TunnelControlResponseRequestCodec,
+};
 
 use crate::connection::CryptoLengthDelimitedFramed;
 use crate::crypto::RsaCryptoRepository;
@@ -13,6 +15,7 @@ use std::fmt::{Debug, Formatter};
 use std::io::Error;
 use std::net::SocketAddr;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
@@ -25,7 +28,9 @@ use tokio_util::io::{SinkWriter, StreamReader};
 use tracing::debug;
 pub struct ProxyTcpConnectionNewState {}
 pub struct ProxyTcpConnectionTunnelCtlState {
-    crypto_tcp_framed: CryptoLengthDelimitedFramed<TfoStream>,
+    tunnel_ctl_response_request_framed: Framed<TfoStream, TunnelControlResponseRequestCodec>,
+    proxy_encryption: Arc<Encryption>,
+    agent_encryption: Arc<Encryption>,
 }
 
 pub struct ProxyTcpConnectionRelayState {
@@ -68,6 +73,7 @@ impl ProxyTcpConnectionInfo {
 }
 pub struct ProxyTcpConnection<T> {
     proxy_socket_address: SocketAddr,
+    frame_buffer_size: usize,
     state: T,
 }
 impl<T> Debug for ProxyTcpConnection<T> {
@@ -143,37 +149,40 @@ impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
             ..
         } = handshake_response_framed.into_parts();
         let proxy_socket_address = proxy_tcp_stream.peer_addr()?;
+        let proxy_encryption = Arc::new(proxy_encryption);
+        let agent_encryption = Arc::new(agent_encryption);
         Ok(ProxyTcpConnection {
             state: ProxyTcpConnectionTunnelCtlState {
-                crypto_tcp_framed: CryptoLengthDelimitedFramed::new(
+                proxy_encryption: proxy_encryption.clone(),
+                agent_encryption: agent_encryption.clone(),
+                tunnel_ctl_response_request_framed: Framed::with_capacity(
                     proxy_tcp_stream,
-                    proxy_encryption,
-                    agent_encryption,
+                    TunnelControlResponseRequestCodec::new(proxy_encryption, agent_encryption),
                     proxy_tcp_connection_info.frame_buffer_size(),
                 ),
             },
             proxy_socket_address,
+            frame_buffer_size: proxy_tcp_connection_info.frame_buffer_size(),
         })
     }
 }
 impl ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState> {
     pub async fn tunnel_init(
-        self,
+        mut self,
         tunnel_init_request: TunnelInitRequest,
     ) -> Result<ProxyTcpConnection<ProxyTcpConnectionRelayState>, CommonError> {
         let tunnel_ctl_request = TunnelControlRequest::TunnelInit(tunnel_init_request);
-        let raw_tunnel_ctl_request_bytes = bincode::serialize(&tunnel_ctl_request)?;
-        let mut crypto_tcp_framed = self.state.crypto_tcp_framed;
-        crypto_tcp_framed
-            .send(&raw_tunnel_ctl_request_bytes)
+        self.state
+            .tunnel_ctl_response_request_framed
+            .send(tunnel_ctl_request)
             .await?;
         loop {
-            let tunnel_ctl_response_bytes = crypto_tcp_framed
+            let tunnel_ctl_response = self
+                .state
+                .tunnel_ctl_response_request_framed
                 .next()
                 .await
                 .ok_or(CommonError::ConnectionExhausted(self.proxy_socket_address))??;
-            let tunnel_ctl_response: TunnelControlResponse =
-                bincode::deserialize(&tunnel_ctl_response_bytes)?;
             match tunnel_ctl_response {
                 TunnelControlResponse::Heartbeat(heart_beat) => {
                     debug!("Receive heartbeat response from proxy connection: {heart_beat:?}");
@@ -181,14 +190,24 @@ impl ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState> {
                 }
                 TunnelControlResponse::TunnelInit(tunnel_init_response) => {
                     return match tunnel_init_response {
-                        TunnelInitResponse::Success => Ok(ProxyTcpConnection {
-                            proxy_socket_address: self.proxy_socket_address,
-                            state: ProxyTcpConnectionRelayState {
-                                crypto_tcp_read_write: SinkWriter::new(StreamReader::new(
-                                    crypto_tcp_framed,
-                                )),
-                            },
-                        }),
+                        TunnelInitResponse::Success => {
+                            let FramedParts { io, .. } =
+                                self.state.tunnel_ctl_response_request_framed.into_parts();
+                            Ok(ProxyTcpConnection {
+                                proxy_socket_address: self.proxy_socket_address,
+                                frame_buffer_size: self.frame_buffer_size,
+                                state: ProxyTcpConnectionRelayState {
+                                    crypto_tcp_read_write: SinkWriter::new(StreamReader::new(
+                                        CryptoLengthDelimitedFramed::new(
+                                            io,
+                                            self.state.proxy_encryption,
+                                            self.state.agent_encryption,
+                                            self.frame_buffer_size,
+                                        ),
+                                    )),
+                                },
+                            })
+                        }
                         TunnelInitResponse::Failure(TunnelInitFailureReason::AuthenticateFail) => {
                             Err(CommonError::Other(format!(
                                 "Tunnel init fail on authenticate: {tunnel_init_response:?}",
@@ -206,19 +225,17 @@ impl ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState> {
     }
     pub async fn heartbeat(&mut self, timeout_seconds: u64) -> Result<(), CommonError> {
         let heartbeat_request = TunnelControlRequest::Heartbeat(HeartbeatRequest::new());
-        let raw_tunnel_ctl_request = bincode::serialize(&heartbeat_request)?;
+
         self.state
-            .crypto_tcp_framed
-            .send(&raw_tunnel_ctl_request)
+            .tunnel_ctl_response_request_framed
+            .send(heartbeat_request)
             .await?;
-        let raw_tunnel_ctl_response_bytes = timeout(
+        let tunnel_ctl_response = timeout(
             Duration::from_secs(timeout_seconds),
-            self.state.crypto_tcp_framed.next(),
+            self.state.tunnel_ctl_response_request_framed.next(),
         )
         .await?
         .ok_or(CommonError::ConnectionExhausted(self.proxy_socket_address))??;
-        let tunnel_ctl_response: TunnelControlResponse =
-            bincode::deserialize(&raw_tunnel_ctl_response_bytes)?;
         match tunnel_ctl_response {
             TunnelControlResponse::Heartbeat(heartbeat_response) => {
                 debug!("Receive heartbeat response from proxy connection: {heartbeat_response:?}");

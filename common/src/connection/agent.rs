@@ -1,4 +1,6 @@
-use crate::connection::codec::{HandshakeRequestDecoder, HandshakeResponseEncoder};
+use crate::connection::codec::{
+    HandshakeRequestDecoder, HandshakeResponseEncoder, TunnelControlRequestResponseCodec,
+};
 use crate::connection::CryptoLengthDelimitedFramed;
 use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
@@ -12,6 +14,7 @@ use ppaass_protocol::{
 use std::io::Error;
 use std::net::SocketAddr;
 use std::pin::Pin;
+use std::sync::Arc;
 use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio::pin;
@@ -24,7 +27,9 @@ pub struct AgentTcpConnectionTunnelCtlState<T>
 where
     T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
 {
-    crypto_tcp_framed: CryptoLengthDelimitedFramed<T>,
+    tunnel_ctl_request_response_framed: Framed<T, TunnelControlRequestResponseCodec>,
+    proxy_encryption: Arc<Encryption>,
+    agent_encryption: Arc<Encryption>,
 }
 pub struct AgentTcpConnectionTcpRelayState<T>
 where
@@ -43,6 +48,7 @@ pub struct AgentTcpConnection<S> {
     agent_socket_address: SocketAddr,
     authentication: String,
     state: S,
+    frame_buffer_size: usize,
 }
 impl<S> AgentTcpConnection<S> {
     pub fn agent_socket_address(&self) -> SocketAddr {
@@ -100,14 +106,19 @@ impl AgentTcpConnection<AgentTcpConnectionNewState> {
             io: agent_tcp_stream,
             ..
         } = handshake_response_framed.into_parts();
+        let proxy_encryption = Arc::new(proxy_encryption);
+        let agent_encryption = Arc::new(agent_encryption);
         Ok(AgentTcpConnection {
             agent_socket_address,
             authentication,
+
+            frame_buffer_size,
             state: AgentTcpConnectionTunnelCtlState {
-                crypto_tcp_framed: CryptoLengthDelimitedFramed::new(
+                proxy_encryption: proxy_encryption.clone(),
+                agent_encryption: agent_encryption.clone(),
+                tunnel_ctl_request_response_framed: Framed::with_capacity(
                     agent_tcp_stream,
-                    agent_encryption,
-                    proxy_encryption,
+                    TunnelControlRequestResponseCodec::new(agent_encryption, proxy_encryption),
                     frame_buffer_size,
                 ),
             },
@@ -120,23 +131,20 @@ where
 {
     pub async fn wait_tunnel_init(&mut self) -> Result<TunnelInitRequest, CommonError> {
         loop {
-            let tunnel_ctl_request_bytes = self
+            let tunnel_ctl_request = self
                 .state
-                .crypto_tcp_framed
+                .tunnel_ctl_request_response_framed
                 .next()
                 .await
                 .ok_or(CommonError::ConnectionExhausted(self.agent_socket_address))??;
-            let tunnel_ctl_request: TunnelControlRequest =
-                bincode::deserialize(&tunnel_ctl_request_bytes)?;
             match tunnel_ctl_request {
                 TunnelControlRequest::Heartbeat(heartbeat_request) => {
                     debug!("Receive heartbeat request from agent connection [{}]: {heartbeat_request:?}", self.agent_socket_address);
                     let heartbeat_response =
                         TunnelControlResponse::Heartbeat(HeartbeatResponse::new());
-                    let heartbeat_response_bytes = bincode::serialize(&heartbeat_response)?;
                     self.state
-                        .crypto_tcp_framed
-                        .send(&heartbeat_response_bytes)
+                        .tunnel_ctl_request_response_framed
+                        .send(heartbeat_response)
                         .await?;
                     continue;
                 }
@@ -152,19 +160,25 @@ where
         tunnel_init_response: TunnelInitResponse,
     ) -> Result<AgentTcpConnection<AgentTcpConnectionTcpRelayState<T>>, CommonError> {
         let tunnel_ctl_response = TunnelControlResponse::TunnelInit(tunnel_init_response);
-        let tunnel_ctl_response_bytes = bincode::serialize(&tunnel_ctl_response)?;
         self.state
-            .crypto_tcp_framed
-            .send(&tunnel_ctl_response_bytes)
+            .tunnel_ctl_request_response_framed
+            .send(tunnel_ctl_response)
             .await?;
+        let FramedParts { io, .. } = self.state.tunnel_ctl_request_response_framed.into_parts();
         Ok(AgentTcpConnection {
             agent_socket_address: self.agent_socket_address,
             authentication: self.authentication,
             state: AgentTcpConnectionTcpRelayState {
                 crypto_tcp_read_write: SinkWriter::new(StreamReader::new(
-                    self.state.crypto_tcp_framed,
+                    CryptoLengthDelimitedFramed::new(
+                        io,
+                        self.state.agent_encryption,
+                        self.state.proxy_encryption,
+                        self.frame_buffer_size,
+                    ),
                 )),
             },
+            frame_buffer_size: self.frame_buffer_size,
         })
     }
 
@@ -173,16 +187,22 @@ where
         tunnel_init_response: TunnelInitResponse,
     ) -> Result<AgentTcpConnection<AgentTcpConnectionUdpRelayState<T>>, CommonError> {
         let tunnel_ctl_response = TunnelControlResponse::TunnelInit(tunnel_init_response);
-        let tunnel_ctl_response_bytes = bincode::serialize(&tunnel_ctl_response)?;
         self.state
-            .crypto_tcp_framed
-            .send(&tunnel_ctl_response_bytes)
+            .tunnel_ctl_request_response_framed
+            .send(tunnel_ctl_response)
             .await?;
+        let FramedParts { io, .. } = self.state.tunnel_ctl_request_response_framed.into_parts();
         Ok(AgentTcpConnection {
+            frame_buffer_size: self.frame_buffer_size,
             agent_socket_address: self.agent_socket_address,
             authentication: self.authentication,
             state: AgentTcpConnectionUdpRelayState {
-                crypto_tcp_framed: self.state.crypto_tcp_framed,
+                crypto_tcp_framed: CryptoLengthDelimitedFramed::new(
+                    io,
+                    self.state.agent_encryption,
+                    self.state.proxy_encryption,
+                    self.frame_buffer_size,
+                ),
             },
         })
     }
