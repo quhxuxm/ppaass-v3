@@ -10,14 +10,14 @@ destination_to_proxy_data_relay_buffer_size = 131072
 destination_connect_timeout = 10
 agent_framed_buffer_size = 262144
 # Forward
-forward_rsa_dir = "resources/forward_rsa"
-forward_proxy_framed_buffer_size = 262144
-forward_proxies = [
-    { proxy_address = "127.0.0.1:10091", proxy_auth = "proxy_forward_user1" },
-    { proxy_address = "127.0.0.1:10092", proxy_auth = "proxy_forward_user1" },
-    { proxy_address = "127.0.0.1:10093", proxy_auth = "proxy_forward_user1" }
-]
-forward_max_pool_size = 32
-forward_fill_interval = 5
-forward_connection_retake_interval = 2
-forward_proxy_connect_timeout = 10
+#forward_rsa_dir = "resources/forward_rsa"
+#forward_proxy_framed_buffer_size = 262144
+#forward_proxies = [
+#    { proxy_address = "127.0.0.1:10091", proxy_auth = "proxy_forward_user1" },
+#    { proxy_address = "127.0.0.1:10092", proxy_auth = "proxy_forward_user1" },
+#    { proxy_address = "127.0.0.1:10093", proxy_auth = "proxy_forward_user1" }
+#]
+#forward_max_pool_size = 32
+#forward_fill_interval = 5
+#forward_connection_retake_interval = 2
+#forward_proxy_connect_timeout = 10
