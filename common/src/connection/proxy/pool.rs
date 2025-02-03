@@ -20,7 +20,6 @@ pub trait ProxyTcpConnectionPoolConfig {
     fn connection_retake_interval(&self) -> u64;
     fn check_interval(&self) -> u64;
     fn connection_max_alive(&self) -> i64;
-
     fn heartbeat_timeout(&self) -> u64;
 }
 #[derive(Debug)]
