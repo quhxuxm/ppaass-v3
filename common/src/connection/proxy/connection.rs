@@ -12,6 +12,7 @@ use ppaass_protocol::{
     Encryption, HandshakeRequest, HandshakeResponse, HeartbeatRequest, TunnelControlRequest,
     TunnelControlResponse, TunnelInitFailureReason, TunnelInitRequest, TunnelInitResponse,
 };
+use rand::random;
 use std::fmt::{Debug, Formatter};
 use std::io::Error;
 use std::net::SocketAddr;
@@ -95,9 +96,13 @@ impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
     where
         R: RsaCryptoRepository + Sync + Send + 'static,
     {
+        let proxy_address_index =
+            random::<u64>() % proxy_tcp_connection_info.proxy_addresses.len() as u64;
         let proxy_tcp_stream = timeout(
             Duration::from_secs(proxy_tcp_connection_info.connect_timeout()),
-            TfoStream::connect(proxy_tcp_connection_info.proxy_addresses()[0]),
+            TfoStream::connect(
+                proxy_tcp_connection_info.proxy_addresses()[proxy_address_index as usize],
+            ),
         )
         .await??;
         proxy_tcp_stream.set_nodelay(true)?;
