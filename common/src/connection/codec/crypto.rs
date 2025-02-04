@@ -47,7 +47,7 @@ impl Decoder for CryptoLengthDelimitedCodec {
 
 impl Encoder<BytesMut> for CryptoLengthDelimitedCodec {
     type Error = CommonError;
-    fn encode(&mut self, mut item: BytesMut, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, item: BytesMut, dst: &mut BytesMut) -> Result<(), Self::Error> {
         match self.encoder_encryption.as_ref() {
             Encryption::Plain => Ok(self.length_delimited.encode(item.freeze(), dst)?),
             Encryption::Aes(token) => {
