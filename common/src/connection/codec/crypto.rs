@@ -2,11 +2,11 @@ use crate::crypto::{
     decrypt_with_aes, decrypt_with_blowfish, encrypt_with_aes, encrypt_with_blowfish,
 };
 use crate::error::CommonError;
+
 use ppaass_protocol::Encryption;
 use std::sync::Arc;
-use tokio_util::bytes::{Bytes, BytesMut};
+use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
-
 pub struct CryptoLengthDelimitedCodec {
     decoder_encryption: Arc<Encryption>,
     encoder_encryption: Arc<Encryption>,
@@ -30,11 +30,11 @@ impl Decoder for CryptoLengthDelimitedCodec {
         let decrypted_bytes = self.length_delimited.decode(src)?;
         match decrypted_bytes {
             None => Ok(None),
-            Some(decrypted_bytes) => match self.decoder_encryption.as_ref() {
+            Some(mut decrypted_bytes) => match self.decoder_encryption.as_ref() {
                 Encryption::Plain => Ok(Some(decrypted_bytes)),
                 Encryption::Aes(token) => {
-                    let raw_bytes = decrypt_with_aes(&token, &decrypted_bytes)?;
-                    Ok(Some(BytesMut::from(&raw_bytes[..])))
+                    let raw_bytes = decrypt_with_aes(&token, decrypted_bytes.as_mut())?;
+                    Ok(Some(BytesMut::from(raw_bytes)))
                 }
                 Encryption::Blowfish(token) => {
                     let raw_bytes = decrypt_with_blowfish(&token, &decrypted_bytes)?;
@@ -45,14 +45,17 @@ impl Decoder for CryptoLengthDelimitedCodec {
     }
 }
 
-impl Encoder<Bytes> for CryptoLengthDelimitedCodec {
+impl Encoder<BytesMut> for CryptoLengthDelimitedCodec {
     type Error = CommonError;
-    fn encode(&mut self, item: Bytes, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, mut item: BytesMut, dst: &mut BytesMut) -> Result<(), Self::Error> {
         match self.encoder_encryption.as_ref() {
-            Encryption::Plain => Ok(self.length_delimited.encode(item, dst)?),
+            Encryption::Plain => Ok(self.length_delimited.encode(item.freeze(), dst)?),
             Encryption::Aes(token) => {
-                let encrypted_bytes = encrypt_with_aes(token, &item)?;
-                Ok(self.length_delimited.encode(encrypted_bytes.into(), dst)?)
+                let data = item.as_mut();
+                let encrypted_bytes = encrypt_with_aes(token, data)?;
+                Ok(self
+                    .length_delimited
+                    .encode(encrypted_bytes.to_vec().into(), dst)?)
             }
             Encryption::Blowfish(token) => {
                 let encrypted_bytes = encrypt_with_blowfish(token, &item)?;

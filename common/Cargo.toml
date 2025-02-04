@@ -26,3 +26,5 @@ async-trait = { workspace = true }
 tokio-tfo = { workspace = true }
 chrono = { workspace = true }
 serde = { workspace = true }
+bytes = { workspace = true }
+cbc = { workspace = true }

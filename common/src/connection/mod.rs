@@ -66,7 +66,7 @@ where
     fn start_send(self: Pin<&mut Self>, item: &[u8]) -> Result<(), CommonError> {
         self.get_mut()
             .crypto_length_delimited_framed
-            .start_send_unpin(item.to_vec().into())
+            .start_send_unpin(BytesMut::from(item))
     }
     fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), CommonError>> {
         self.get_mut()

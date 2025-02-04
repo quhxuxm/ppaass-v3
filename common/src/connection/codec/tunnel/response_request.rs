@@ -43,6 +43,6 @@ impl Encoder<TunnelControlRequest> for TunnelControlResponseRequestCodec {
     ) -> Result<(), Self::Error> {
         let raw_bytes = bincode::serialize(&item)?;
         self.crypto_length_delimited_codec
-            .encode(raw_bytes.into(), dst)
+            .encode(BytesMut::from_iter(raw_bytes), dst)
     }
 }

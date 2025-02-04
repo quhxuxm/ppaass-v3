@@ -1,37 +1,41 @@
-use crate::error::CommonError;
-
 use crate::crypto::random_n_bytes;
+use crate::error::CommonError;
+use blowfish::Blowfish;
+use bytes::Bytes;
 use cipher::block_padding::Pkcs7;
-use cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
-use hyper::body::Bytes;
+use cipher::{BlockDecryptMut, BlockEncryptMut, KeyIvInit};
 
+type BlowfishCbcEncryptor = cbc::Encryptor<Blowfish>;
+type BlowfishCbcDecryptor = cbc::Decryptor<Blowfish>;
 #[inline(always)]
 pub(crate) fn generate_blowfish_encryption_token() -> Bytes {
-    random_n_bytes::<56>()
+    random_n_bytes::<64>()
 }
 
 /// Encrypt the target bytes with Blowfish
 #[inline(always)]
-pub fn encrypt_with_blowfish(
-    encryption_token: &[u8],
-    target: &[u8],
-) -> Result<Vec<u8>, CommonError> {
-    let blowfish_encryptor: blowfish::Blowfish = blowfish::Blowfish::new(encryption_token.into());
-    let result = blowfish_encryptor.encrypt_padded_vec::<Pkcs7>(target);
-    Ok(result)
+pub fn encrypt_with_blowfish(encryption_token: &[u8], target: &[u8]) -> Result<Bytes, CommonError> {
+    let encryptor =
+        BlowfishCbcEncryptor::new_from_slices(&encryption_token[..56], &encryption_token[56..])
+            .map_err(|e| {
+                CommonError::Other(format!("Fail to generate blowfish encryptor: {e:?}"))
+            })?;
+    let result = encryptor.encrypt_padded_vec_mut::<Pkcs7>(target);
+    Ok(result.into())
 }
 
 /// Decrypt the target bytes with Blowfish
 #[inline(always)]
-pub fn decrypt_with_blowfish(
-    encryption_token: &[u8],
-    target: &[u8],
-) -> Result<Vec<u8>, CommonError> {
-    let blowfish_encryptor: blowfish::Blowfish = blowfish::Blowfish::new(encryption_token.into());
-    let result = blowfish_encryptor
-        .decrypt_padded_vec::<Pkcs7>(target)
+pub fn decrypt_with_blowfish(encryption_token: &[u8], target: &[u8]) -> Result<Bytes, CommonError> {
+    let decryptor =
+        BlowfishCbcDecryptor::new_from_slices(&encryption_token[..56], &encryption_token[56..])
+            .map_err(|e| {
+                CommonError::Other(format!("Fail to generate blowfish decryptor: {e:?}"))
+            })?;
+    let result = decryptor
+        .decrypt_padded_vec_mut::<Pkcs7>(target)
         .map_err(|e| CommonError::Aes(format!("Fail to decrypt with blowfish block: {e:?}")))?;
-    Ok(result)
+    Ok(result.into())
 }
 
 #[test]
