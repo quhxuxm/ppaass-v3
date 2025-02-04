@@ -30,7 +30,7 @@ impl Decoder for CryptoLengthDelimitedCodec {
         let decrypted_bytes = self.length_delimited.decode(src)?;
         match decrypted_bytes {
             None => Ok(None),
-            Some(mut decrypted_bytes) => match self.decoder_encryption.as_ref() {
+            Some(decrypted_bytes) => match self.decoder_encryption.as_ref() {
                 Encryption::Plain => Ok(Some(decrypted_bytes)),
                 Encryption::Aes(token) => {
                     let raw_bytes = decrypt_with_aes(&token, &decrypted_bytes)?;
