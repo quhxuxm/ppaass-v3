@@ -4,11 +4,14 @@ use crate::crypto::random_n_bytes;
 use cipher::block_padding::Pkcs7;
 use cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
 use hyper::body::Bytes;
+
+#[inline(always)]
 pub(crate) fn generate_blowfish_encryption_token() -> Bytes {
     random_n_bytes::<56>()
 }
 
 /// Encrypt the target bytes with Blowfish
+#[inline(always)]
 pub fn encrypt_with_blowfish(
     encryption_token: &[u8],
     target: &[u8],
@@ -19,6 +22,7 @@ pub fn encrypt_with_blowfish(
 }
 
 /// Decrypt the target bytes with Blowfish
+#[inline(always)]
 pub fn decrypt_with_blowfish(
     encryption_token: &[u8],
     target: &[u8],

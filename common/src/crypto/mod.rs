@@ -13,6 +13,7 @@ use std::path::Path;
 use std::sync::Arc;
 use tracing::error;
 
+#[inline(always)]
 fn random_n_bytes<const N: usize>() -> Bytes {
     let random_n_bytes = random::<[u8; N]>();
     random_n_bytes.to_vec().into()

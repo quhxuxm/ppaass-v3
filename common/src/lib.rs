@@ -17,11 +17,13 @@ use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::fmt::time::ChronoUtc;
 use uuid::Uuid;
 /// Generate a random UUID
+#[inline(always)]
 pub fn generate_uuid() -> String {
     Uuid::new_v4().to_string().replace("-", "").to_uppercase()
 }
 
 /// Randomly generate a raw encryption
+#[inline(always)]
 pub fn random_generate_encryption() -> Encryption {
     let random_number = random::<u64>();
     if random_number % 2 == 0 {
@@ -31,6 +33,7 @@ pub fn random_generate_encryption() -> Encryption {
     }
 }
 
+#[inline(always)]
 pub fn rsa_encrypt_encryption<'a>(
     raw_encryption: &'a Encryption,
     rsa_crypto: &RsaCrypto,
@@ -48,6 +51,7 @@ pub fn rsa_encrypt_encryption<'a>(
     }
 }
 
+#[inline(always)]
 pub fn rsa_decrypt_encryption<'a>(
     encrypted_encryption: &'a Encryption,
     rsa_crypto: &RsaCrypto,
@@ -90,6 +94,7 @@ pub fn init_logger(
     Ok(_trace_appender_guard)
 }
 
+#[inline(always)]
 pub fn parse_to_socket_addresses<I, T>(addresses: I) -> Result<Vec<SocketAddr>, CommonError>
 where
     I: Iterator<Item = T>,

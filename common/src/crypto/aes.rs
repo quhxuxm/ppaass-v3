@@ -6,11 +6,13 @@ use cipher::block_padding::Pkcs7;
 use cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
 use hyper::body::Bytes;
 /// Generate the encryption token for AES
+#[inline(always)]
 pub(crate) fn generate_aes_encryption_token() -> Bytes {
     random_n_bytes::<32>()
 }
 
 /// Encrypt the target bytes with AES
+#[inline(always)]
 pub fn encrypt_with_aes(encryption_token: &[u8], target: &[u8]) -> Result<Bytes, CommonError> {
     let aes_encryptor = Aes256::new(encryption_token.into());
     let result = aes_encryptor.encrypt_padded_vec::<Pkcs7>(target);
@@ -18,6 +20,7 @@ pub fn encrypt_with_aes(encryption_token: &[u8], target: &[u8]) -> Result<Bytes,
 }
 
 /// Decrypt the target bytes with AES
+#[inline(always)]
 pub fn decrypt_with_aes(encryption_token: &[u8], target: &[u8]) -> Result<Bytes, CommonError> {
     let aes_decrypt = Aes256::new(encryption_token.into());
     let result = aes_decrypt
