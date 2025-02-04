@@ -1,5 +1,5 @@
 ip_v6 = false
-server_port = 8080
+server_port = 80
 worker_thread_number = 256
 log_dir = "log"
 log_name_prefix = "ppaass-proxy-v3"
