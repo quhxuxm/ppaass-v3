@@ -4,25 +4,26 @@ use crate::crypto::random_n_bytes;
 use aes::Aes256;
 use cipher::block_padding::Pkcs7;
 use cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
+use hyper::body::Bytes;
 /// Generate the encryption token for AES
-pub(crate) fn generate_aes_encryption_token() -> Vec<u8> {
+pub(crate) fn generate_aes_encryption_token() -> Bytes {
     random_n_bytes::<32>()
 }
 
 /// Encrypt the target bytes with AES
-pub fn encrypt_with_aes(encryption_token: &[u8], target: &[u8]) -> Result<Vec<u8>, CommonError> {
+pub fn encrypt_with_aes(encryption_token: &[u8], target: &[u8]) -> Result<Bytes, CommonError> {
     let aes_encryptor = Aes256::new(encryption_token.into());
     let result = aes_encryptor.encrypt_padded_vec::<Pkcs7>(target);
-    Ok(result)
+    Ok(result.into())
 }
 
 /// Decrypt the target bytes with AES
-pub fn decrypt_with_aes(encryption_token: &[u8], target: &[u8]) -> Result<Vec<u8>, CommonError> {
+pub fn decrypt_with_aes(encryption_token: &[u8], target: &[u8]) -> Result<Bytes, CommonError> {
     let aes_decrypt = Aes256::new(encryption_token.into());
     let result = aes_decrypt
         .decrypt_padded_vec::<Pkcs7>(target)
         .map_err(|e| CommonError::Aes(format!("Fail to decrypt with aes block: {e:?}")))?;
-    Ok(result)
+    Ok(result.into())
 }
 #[test]
 fn test() -> Result<(), CommonError> {

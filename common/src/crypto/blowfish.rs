@@ -3,7 +3,8 @@ use crate::error::CommonError;
 use crate::crypto::random_n_bytes;
 use cipher::block_padding::Pkcs7;
 use cipher::{BlockDecrypt, BlockEncrypt, KeyInit};
-pub(crate) fn generate_blowfish_encryption_token() -> Vec<u8> {
+use hyper::body::Bytes;
+pub(crate) fn generate_blowfish_encryption_token() -> Bytes {
     random_n_bytes::<56>()
 }
 

@@ -4,6 +4,7 @@ mod rsa;
 use crate::error::CommonError;
 pub use aes::*;
 pub use blowfish::*;
+use hyper::body::Bytes;
 use rand::random;
 pub use rsa::*;
 use std::collections::HashMap;
@@ -12,9 +13,9 @@ use std::path::Path;
 use std::sync::Arc;
 use tracing::error;
 
-fn random_n_bytes<const N: usize>() -> Vec<u8> {
+fn random_n_bytes<const N: usize>() -> Bytes {
     let random_n_bytes = random::<[u8; N]>();
-    random_n_bytes.to_vec()
+    random_n_bytes.to_vec().into()
 }
 
 pub trait RsaCryptoRepository {

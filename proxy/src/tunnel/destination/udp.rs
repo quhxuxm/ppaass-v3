@@ -54,7 +54,7 @@ impl DestinationUdpEndpoint {
             let udp_relay_data_response = UdpRelayDataResponse {
                 destination_address,
                 source_address,
-                payload: destination_udp_data.to_vec(),
+                payload: destination_udp_data.to_vec().into(),
             };
             let udp_relay_data_response_bytes = match bincode::serialize(&udp_relay_data_response) {
                 Ok(udp_relay_data_response_bytes) => udp_relay_data_response_bytes,

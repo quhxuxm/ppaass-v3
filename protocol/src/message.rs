@@ -1,4 +1,5 @@
 use crate::UnifiedAddress;
+use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 /// The encryption in Handshake message used to
@@ -8,9 +9,9 @@ pub enum Encryption {
     /// The data will send in plain
     Plain,
     /// The data will send with aes encryption
-    Aes(#[serde(with = "crate::hex")] Vec<u8>),
+    Aes(#[serde(with = "crate::hex")] Bytes),
     /// The data will send with blowfish encryption
-    Blowfish(#[serde(with = "crate::hex")] Vec<u8>),
+    Blowfish(#[serde(with = "crate::hex")] Bytes),
 }
 
 /// The handshake message between agent and proxy.
@@ -120,7 +121,7 @@ pub struct UdpRelayDataRequest {
     pub destination_address: UnifiedAddress,
     pub source_address: UnifiedAddress,
     #[serde(with = "crate::hex")]
-    pub payload: Vec<u8>,
+    pub payload: Bytes,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -128,5 +129,5 @@ pub struct UdpRelayDataResponse {
     pub destination_address: UnifiedAddress,
     pub source_address: UnifiedAddress,
     #[serde(with = "crate::hex")]
-    pub payload: Vec<u8>,
+    pub payload: Bytes,
 }

@@ -1,4 +1,5 @@
 use crate::error::CommonError;
+use hyper::body::Bytes;
 use rsa::rand_core::OsRng;
 use rsa::{
     pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey, LineEnding},
@@ -41,21 +42,21 @@ impl RsaCrypto {
     }
 
     /// Encrypt the target bytes with RSA public key
-    pub fn encrypt(&self, target: &[u8]) -> Result<Vec<u8>, CommonError> {
+    pub fn encrypt(&self, target: &[u8]) -> Result<Bytes, CommonError> {
         let result = self
             .public_key
             .encrypt(&mut OsRng, Pkcs1v15Encrypt, target.as_ref())
             .map_err(|e| CommonError::Rsa(format!("Fail to encrypt with agent_rsa: {e:?}")))?;
-        Ok(result)
+        Ok(result.into())
     }
 
     /// Decrypt the target bytes with RSA private key
-    pub fn decrypt(&self, target: &[u8]) -> Result<Vec<u8>, CommonError> {
+    pub fn decrypt(&self, target: &[u8]) -> Result<Bytes, CommonError> {
         let result = self
             .private_key
             .decrypt(Pkcs1v15Encrypt, target.as_ref())
             .map_err(|e| CommonError::Rsa(format!("Fail to decrypt with agent_rsa: {e:?}")))?;
-        Ok(result)
+        Ok(result.into())
     }
 }
 
