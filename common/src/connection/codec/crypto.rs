@@ -33,12 +33,12 @@ impl Decoder for CryptoLengthDelimitedCodec {
             Some(mut decrypted_bytes) => match self.decoder_encryption.as_ref() {
                 Encryption::Plain => Ok(Some(decrypted_bytes)),
                 Encryption::Aes(token) => {
-                    let raw_bytes = decrypt_with_aes(&token, decrypted_bytes.as_mut())?;
+                    let raw_bytes = decrypt_with_aes(&token, &decrypted_bytes)?;
                     Ok(Some(BytesMut::from(raw_bytes)))
                 }
                 Encryption::Blowfish(token) => {
                     let raw_bytes = decrypt_with_blowfish(&token, &decrypted_bytes)?;
-                    Ok(Some(BytesMut::from(&raw_bytes[..])))
+                    Ok(Some(BytesMut::from(raw_bytes)))
                 }
             },
         }
@@ -51,15 +51,12 @@ impl Encoder<BytesMut> for CryptoLengthDelimitedCodec {
         match self.encoder_encryption.as_ref() {
             Encryption::Plain => Ok(self.length_delimited.encode(item.freeze(), dst)?),
             Encryption::Aes(token) => {
-                let data = item.as_mut();
-                let encrypted_bytes = encrypt_with_aes(token, data)?;
-                Ok(self
-                    .length_delimited
-                    .encode(encrypted_bytes.to_vec().into(), dst)?)
+                let encrypted_bytes = encrypt_with_aes(token, &item)?;
+                Ok(self.length_delimited.encode(encrypted_bytes, dst)?)
             }
             Encryption::Blowfish(token) => {
                 let encrypted_bytes = encrypt_with_blowfish(token, &item)?;
-                Ok(self.length_delimited.encode(encrypted_bytes.into(), dst)?)
+                Ok(self.length_delimited.encode(encrypted_bytes, dst)?)
             }
         }
     }
