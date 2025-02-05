@@ -3,8 +3,9 @@ use crate::error::CommonError;
 use crate::{ProxyTcpConnection, ProxyTcpConnectionInfo, ProxyTcpConnectionTunnelCtlState};
 use chrono::{DateTime, Utc};
 use concurrent_queue::{ConcurrentQueue, PopError, PushError};
+use std::cmp::Ordering;
 use std::fmt::Debug;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::channel;
@@ -23,13 +24,14 @@ pub trait ProxyTcpConnectionPoolConfig {
     fn heartbeat_timeout(&self) -> u64;
 }
 #[derive(Debug)]
-pub struct ProxyTcpConnectionPoolElement<C>
+struct ProxyTcpConnectionPoolElement<C>
 where
     C: ProxyTcpConnectionPoolConfig + Debug + Send + Sync + 'static,
 {
     proxy_tcp_connection: ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>,
     create_time: DateTime<Utc>,
     last_check_time: DateTime<Utc>,
+    last_check_duration: i64,
     config: Arc<C>,
 }
 impl<C> ProxyTcpConnectionPoolElement<C>
@@ -44,6 +46,7 @@ where
             proxy_tcp_connection,
             last_check_time: Utc::now(),
             create_time: Utc::now(),
+            last_check_duration: 0,
             config,
         }
     }
@@ -139,10 +142,12 @@ where
         config: &C,
     ) -> Result<(), CommonError> {
         debug!("Checking proxy connection : {proxy_tcp_connection_pool_element:?}");
-        proxy_tcp_connection_pool_element
+        let check_duration = proxy_tcp_connection_pool_element
             .proxy_tcp_connection
             .heartbeat(config.heartbeat_timeout())
-            .await
+            .await?;
+        proxy_tcp_connection_pool_element.last_check_duration = check_duration;
+        Ok(())
     }
     fn start_connection_check_task(
         config: Arc<C>,
@@ -152,7 +157,7 @@ where
     ) {
         tokio::spawn(async move {
             loop {
-                if filling.load(Ordering::Relaxed) {
+                if filling.load(AtomicOrdering::Relaxed) {
                     debug!("Cancel checking proxy connection pool, because of filling loop is in parallel.");
                     sleep(Duration::from_secs(config.check_interval())).await;
                     continue;
@@ -211,7 +216,14 @@ where
                 while let Some(proxy_connection) = checking_rx.recv().await {
                     connections.push(proxy_connection);
                 }
-                connections.sort_by(|a, b| a.last_check_time.cmp(&b.last_check_time));
+                connections.sort_by(|a, b| {
+                    let comp = a.last_check_duration.cmp(&b.last_check_duration);
+                    if Ordering::Equal == comp {
+                        a.last_check_time.cmp(&b.last_check_time)
+                    } else {
+                        comp
+                    }
+                });
                 for proxy_connection in connections {
                     match pool.push(proxy_connection) {
                         Ok(()) => {
@@ -283,7 +295,7 @@ where
             return;
         }
         tokio::spawn(async move {
-            if filling.load(Ordering::Relaxed) {
+            if filling.load(AtomicOrdering::Relaxed) {
                 debug!(
                     "Cancel filling proxy connection pool, because of filling process is running."
                 );
@@ -296,7 +308,7 @@ where
                 return;
             }
             debug!("Begin to fill proxy connection pool");
-            filling.store(true, Ordering::Relaxed);
+            filling.store(true, AtomicOrdering::Relaxed);
             let (proxy_tcp_connection_tx, mut proxy_tcp_connection_rx) =
                 channel::<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>>(max_pool_size);
             let current_pool_size = pool.len();
@@ -360,7 +372,7 @@ where
                     }
                 }
             }
-            filling.store(false, Ordering::Relaxed);
+            filling.store(false, AtomicOrdering::Relaxed);
         });
     }
 }

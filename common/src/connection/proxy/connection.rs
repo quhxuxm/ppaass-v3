@@ -7,6 +7,7 @@ use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
 
 use crate::{random_generate_encryption, rsa_decrypt_encryption, rsa_encrypt_encryption};
+use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
 use ppaass_protocol::{
     Encryption, HandshakeRequest, HandshakeResponse, HeartbeatRequest, TunnelControlRequest,
@@ -218,9 +219,10 @@ impl ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState> {
             }
         }
     }
-    pub async fn heartbeat(&mut self, timeout_seconds: u64) -> Result<(), CommonError> {
-        let heartbeat_request = TunnelControlRequest::Heartbeat(HeartbeatRequest::new());
+    pub async fn heartbeat(&mut self, timeout_seconds: u64) -> Result<i64, CommonError> {
+        let start_time = Utc::now();
 
+        let heartbeat_request = TunnelControlRequest::Heartbeat(HeartbeatRequest::new());
         self.state
             .tunnel_ctl_response_request_framed
             .send(heartbeat_request)
@@ -233,8 +235,12 @@ impl ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState> {
         .ok_or(CommonError::ConnectionExhausted(self.proxy_socket_address))??;
         match tunnel_ctl_response {
             TunnelControlResponse::Heartbeat(heartbeat_response) => {
+                let end_time = Utc::now();
+                let check_duration = end_time
+                    .signed_duration_since(start_time)
+                    .num_milliseconds();
                 debug!("Receive heartbeat response from proxy connection: {heartbeat_response:?}");
-                Ok(())
+                Ok(check_duration)
             }
             TunnelControlResponse::TunnelInit(_) => Err(CommonError::Other(format!(
                 "Receive tunnel init response from proxy connection: {}",
