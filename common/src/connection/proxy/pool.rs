@@ -194,17 +194,14 @@ where
                     let config = config.clone();
 
                     tokio::spawn(async move {
-                        match Self::check_proxy_connection(
+                        if let Err(e) = Self::check_proxy_connection(
                             &mut proxy_tcp_connection_pool_element,
                             &config,
                         )
                         .await
                         {
-                            Ok(proxy_connection) => proxy_connection,
-                            Err(e) => {
-                                error!("Failed to check proxy connection: {}", e);
-                                return;
-                            }
+                            error!("Failed to check proxy connection: {}", e);
+                            return;
                         };
                         if let Err(e) = checking_tx.send(proxy_tcp_connection_pool_element).await {
                             error!("Fail to push proxy connection back to pool: {}", e);
