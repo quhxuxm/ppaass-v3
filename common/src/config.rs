@@ -14,7 +14,6 @@ pub struct ConnectionPoolConfig {
     check_interval: u64,
     connection_max_alive: i64,
     heartbeat_timeout: u64,
-    connection_re_push_on_pool_full_interval: u64,
 }
 
 impl ProxyTcpConnectionPoolConfig for ConnectionPoolConfig {
