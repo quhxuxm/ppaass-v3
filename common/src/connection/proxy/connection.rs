@@ -172,6 +172,7 @@ impl ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState> {
             .tunnel_ctl_response_request_framed
             .send(tunnel_ctl_request)
             .await?;
+        let mut times_to_receive_heartbeat = 0;
         loop {
             let tunnel_ctl_response = self
                 .state
@@ -180,8 +181,14 @@ impl ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState> {
                 .await
                 .ok_or(CommonError::ConnectionExhausted(self.proxy_socket_address))??;
             match tunnel_ctl_response {
-                TunnelControlResponse::Heartbeat(heart_beat) => {
-                    debug!("Receive heartbeat response from proxy connection: {heart_beat:?}");
+                TunnelControlResponse::Heartbeat(heartbeat) => {
+                    debug!("Receive heartbeat response from proxy connection: {heartbeat:?}");
+                    times_to_receive_heartbeat += 1;
+                    if times_to_receive_heartbeat > 3 {
+                        return Err(CommonError::Other(
+                            "Receive too many heartbeats when initialize tunnel.".to_string(),
+                        ));
+                    }
                     continue;
                 }
                 TunnelControlResponse::TunnelInit(tunnel_init_response) => {
