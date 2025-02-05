@@ -26,4 +26,4 @@ connection_retake_interval = 2
 check_interval = 10
 connection_max_alive = 300
 heartbeat_timeout = 10
-connection_re_push_on_pool_full_interval = 2
+

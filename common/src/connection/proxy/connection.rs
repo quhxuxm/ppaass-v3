@@ -255,6 +255,10 @@ impl ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState> {
             ))),
         }
     }
+
+    pub async fn close(&mut self) -> Result<(), CommonError> {
+        self.state.tunnel_ctl_response_request_framed.close().await
+    }
 }
 
 impl AsyncRead for ProxyTcpConnection<ProxyTcpConnectionRelayState> {

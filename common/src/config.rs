@@ -36,7 +36,4 @@ impl ProxyTcpConnectionPoolConfig for ConnectionPoolConfig {
     fn heartbeat_timeout(&self) -> u64 {
         self.heartbeat_timeout
     }
-    fn connection_re_push_on_pool_full_interval(&self) -> u64 {
-        self.connection_re_push_on_pool_full_interval
-    }
 }
