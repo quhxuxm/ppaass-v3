@@ -9,8 +9,8 @@ log_dir = "log"
 log_name_prefix = "ppaass-agent-v3"
 max_log_level = "error"
 rsa_dir = "resources/rsa"
-agent_to_proxy_data_relay_buffer_size = 131072
-proxy_to_agent_data_relay_buffer_size = 131072
+agent_to_proxy_data_relay_buffer_size = 32768
+proxy_to_agent_data_relay_buffer_size = 32768
 proxy_framed_buffer_size = 262144
 proxy_connect_timeout = 10
 # The connection pool configuration

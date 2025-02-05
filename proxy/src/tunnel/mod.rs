@@ -42,7 +42,7 @@ impl Tunnel {
             agent_tcp_stream,
             agent_socket_address,
             rsa_crypto_repo.as_ref(),
-            config.agent_framed_buffer_size(),
+            config.agent_frame_buffer_size(),
         )
         .await?;
         Ok(Self {

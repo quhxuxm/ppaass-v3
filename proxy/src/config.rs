@@ -26,7 +26,7 @@ pub struct ProxyConfig {
     #[access(get(cp))]
     destination_connect_timeout: u64,
     #[access(get(cp))]
-    agent_framed_buffer_size: usize,
+    agent_frame_buffer_size: usize,
     #[access(get(cp))]
     proxy_to_destination_data_relay_buffer_size: usize,
     #[access(get(cp))]
