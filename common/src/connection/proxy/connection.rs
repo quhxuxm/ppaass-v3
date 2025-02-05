@@ -184,7 +184,7 @@ impl ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState> {
                 TunnelControlResponse::Heartbeat(heartbeat) => {
                     debug!("Receive heartbeat response from proxy connection: {heartbeat:?}");
                     times_to_receive_heartbeat += 1;
-                    if times_to_receive_heartbeat > 3 {
+                    if times_to_receive_heartbeat >= 3 {
                         return Err(CommonError::Other(
                             "Receive too many heartbeats when initialize tunnel.".to_string(),
                         ));

@@ -20,6 +20,7 @@ pub trait ProxyTcpConnectionPoolConfig {
     fn fill_interval(&self) -> u64;
     fn connection_retake_interval(&self) -> u64;
     fn check_interval(&self) -> u64;
+    fn connection_re_push_on_pool_full_interval(&self) -> u64;
     fn connection_max_alive(&self) -> i64;
     fn heartbeat_timeout(&self) -> u64;
 }
@@ -221,19 +222,33 @@ where
                         comp
                     }
                 });
-                for proxy_connection in connections {
-                    match pool.push(proxy_connection) {
-                        Ok(()) => {
-                            debug!("Success push proxy connection back to pool after checking, current pool size: {}", pool.len());
-                        }
-                        Err(PushError::Closed(proxy_connection)) => {
-                            debug!("Stop checking because of connection pool closed, current checking proxy connection :{proxy_connection:?}");
-                            return;
-                        }
-                        Err(PushError::Full(proxy_connection)) => {
-                            debug!("Drop proxy connection because of after checking connection pool is full, current checking proxy connection :{proxy_connection:?}");
-                        }
-                    };
+                for proxy_connection_element in connections {
+                    let mut proxy_connection_element_to_push = proxy_connection_element;
+                    let mut push_time = 0;
+                    loop {
+                        match pool.push(proxy_connection_element_to_push) {
+                            Ok(()) => {
+                                debug!("Success push proxy connection back to pool after checking, current pool size: {}", pool.len());
+                                break;
+                            }
+                            Err(PushError::Closed(proxy_connection)) => {
+                                debug!("Stop checking because of connection pool closed, current checking proxy connection :{proxy_connection:?}");
+                                return;
+                            }
+                            Err(PushError::Full(proxy_connection_element)) => {
+                                debug!("Wait a while to push proxy connection back to pool because of after checking connection pool is full, current checking proxy connection :{proxy_connection_element:?}");
+                                sleep(Duration::from_secs(
+                                    config.connection_re_push_on_pool_full_interval(),
+                                ))
+                                .await;
+                                proxy_connection_element_to_push = proxy_connection_element;
+                                push_time += 1;
+                                if push_time >= 3 {
+                                    break;
+                                }
+                            }
+                        };
+                    }
                 }
                 sleep(Duration::from_secs(config.check_interval())).await;
             }
@@ -349,23 +364,34 @@ where
             drop(proxy_tcp_connection_tx);
             debug!("Waiting for proxy connection creation result.");
             while let Some(proxy_tcp_connection) = proxy_tcp_connection_rx.recv().await {
-                match pool.push(ProxyTcpConnectionPoolElement::new(
-                    proxy_tcp_connection,
-                    config.clone(),
-                )) {
-                    Ok(()) => {
-                        debug!(
-                            "Proxy connection created, add to pool, current pool size: {}",
-                            pool.len()
-                        );
-                    }
-                    Err(PushError::Full(proxy_tcp_connection_element)) => {
-                        error!(
-                            "Failed to push connection into pool because of pool full: {proxy_tcp_connection_element:?}"
-                        );
-                    }
-                    Err(PushError::Closed(proxy_tcp_connection_element)) => {
-                        error!("Failed to push connection into pool because of pool closed: {proxy_tcp_connection_element:?}");
+                let mut proxy_tcp_connection_element_to_push =
+                    ProxyTcpConnectionPoolElement::new(proxy_tcp_connection, config.clone());
+                let mut push_time = 0;
+                loop {
+                    match pool.push(proxy_tcp_connection_element_to_push) {
+                        Ok(()) => {
+                            debug!(
+                                "Proxy connection created, add to pool, current pool size: {}",
+                                pool.len()
+                            );
+                            break;
+                        }
+                        Err(PushError::Full(proxy_tcp_connection_element)) => {
+                            error!("Waiting a moment to push connection into pool because of pool full: {proxy_tcp_connection_element:?}");
+                            sleep(Duration::from_secs(
+                                config.connection_re_push_on_pool_full_interval(),
+                            ))
+                            .await;
+                            proxy_tcp_connection_element_to_push = proxy_tcp_connection_element;
+                            push_time += 1;
+                            if push_time >= 3 {
+                                break;
+                            }
+                        }
+                        Err(PushError::Closed(proxy_tcp_connection_element)) => {
+                            error!("Failed to push connection into pool because of pool closed: {proxy_tcp_connection_element:?}");
+                            break;
+                        }
                     }
                 }
             }
