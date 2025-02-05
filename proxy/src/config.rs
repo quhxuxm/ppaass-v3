@@ -51,8 +51,8 @@ pub struct ForwardConfig {
 
 #[derive(Serialize, Deserialize, Accessors, Debug, Clone)]
 pub struct ForwardProxyInfo {
-    #[access(get(ty=&str))]
-    pub proxy_address: String,
+    #[access(get)]
+    pub proxy_addresses: Vec<String>,
     #[access(get(ty=&str))]
     pub proxy_auth: String,
 }
@@ -71,10 +71,10 @@ impl ServerConfig for ProxyConfig {
 
 impl ProxyTcpConnectionInfoSelector for ForwardConfig {
     fn select_proxy_tcp_connection_info(&self) -> Result<ProxyTcpConnectionInfo, CommonError> {
-        let select_index = random::<u32>() % self.proxies.len() as u32;
+        let select_index = random::<u64>() % self.proxies.len() as u64;
         let forward_proxy_info = &self.proxies[select_index as usize];
         let proxy_addresses =
-            parse_to_socket_addresses(vec![forward_proxy_info.proxy_address.clone()].iter())?;
+            parse_to_socket_addresses(forward_proxy_info.proxy_addresses().iter())?;
         Ok(ProxyTcpConnectionInfo::new(
             proxy_addresses,
             forward_proxy_info.proxy_auth.to_owned(),
