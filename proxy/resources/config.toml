@@ -22,8 +22,7 @@ proxies = [
 [forward.connection_pool]
 max_pool_size = 32
 fill_interval = 5
-connection_retake_interval = 2
-check_interval = 10
-connection_max_alive = 300
+check_interval = 60
+connection_max_alive = 120
 heartbeat_timeout = 10
 

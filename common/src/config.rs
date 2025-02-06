@@ -10,7 +10,6 @@ pub trait ServerConfig {
 pub struct ConnectionPoolConfig {
     max_pool_size: usize,
     fill_interval: u64,
-    connection_retake_interval: u64,
     check_interval: u64,
     connection_max_alive: i64,
     heartbeat_timeout: u64,
