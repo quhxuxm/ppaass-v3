@@ -23,9 +23,7 @@ impl ProxyTcpConnectionPoolConfig for ConnectionPoolConfig {
     fn fill_interval(&self) -> u64 {
         self.fill_interval
     }
-    fn connection_retake_interval(&self) -> u64 {
-        self.connection_retake_interval
-    }
+
     fn check_interval(&self) -> u64 {
         self.check_interval
     }

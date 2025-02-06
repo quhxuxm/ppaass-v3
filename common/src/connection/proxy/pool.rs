@@ -17,7 +17,6 @@ pub trait ProxyTcpConnectionInfoSelector {
 pub trait ProxyTcpConnectionPoolConfig {
     fn max_pool_size(&self) -> usize;
     fn fill_interval(&self) -> u64;
-    fn connection_retake_interval(&self) -> u64;
     fn check_interval(&self) -> u64;
     fn connection_max_alive(&self) -> i64;
     fn heartbeat_timeout(&self) -> u64;
