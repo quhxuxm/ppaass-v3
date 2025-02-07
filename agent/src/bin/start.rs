@@ -1,7 +1,7 @@
 use clap::Parser;
-use ppaass_agent::handle_client_connection;
 use ppaass_agent::AgentConfig;
 use ppaass_agent::Command;
+use ppaass_agent::{handle_client_connection, start_server};
 use ppaass_common::config::ServerConfig;
 use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
@@ -20,56 +20,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 const USER_SERVER_PUBLIC_KEY: &str = "ProxyPublicKey.pem";
 const USER_AGENT_PRIVATE_KEY: &str = "AgentPrivateKey.pem";
 const DEFAULT_CONFIG_FILE: &str = "resources/config.toml";
-
-async fn create_server_listener(config: Arc<AgentConfig>) -> Result<ServerListener, CommonError> {
-    if config.ip_v6() {
-        debug!(
-            "Starting server listener with IPv6 on port: {}",
-            config.server_port()
-        );
-        Ok(ServerListener::TcpListener(
-            TcpListener::bind(SocketAddr::new(
-                IpAddr::V6(Ipv6Addr::UNSPECIFIED),
-                config.server_port(),
-            ))
-            .await?,
-        ))
-    } else {
-        debug!(
-            "Starting server listener with IPv4 on port: {}",
-            config.server_port()
-        );
-        Ok(ServerListener::TcpListener(
-            TcpListener::bind(SocketAddr::new(
-                IpAddr::V4(Ipv4Addr::UNSPECIFIED),
-                config.server_port(),
-            ))
-            .await?,
-        ))
-    }
-}
-
-async fn start_server(
-    config: Arc<AgentConfig>,
-    rsa_crypto_repo: Arc<FileSystemRsaCryptoRepo>,
-) -> Result<(), CommonError> {
-    let mut server_state = ServerState::new();
-    server_state.add_value(rsa_crypto_repo.clone());
-    if let Some(connection_pool_config) = config.connection_pool() {
-        let proxy_tcp_connection_pool = ProxyTcpConnectionPool::new(
-            Arc::new(connection_pool_config.clone()),
-            rsa_crypto_repo.clone(),
-            config.clone(),
-        )
-        .await?;
-        server_state.add_value(Arc::new(proxy_tcp_connection_pool));
-    }
-    let server = CommonServer::new(config.clone(), server_state);
-    server
-        .run(create_server_listener, handle_client_connection)
-        .await?;
-    Ok(())
-}
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let command = Command::parse();
