@@ -1,7 +1,7 @@
-use crate::command::Command;
-use crate::config::AgentConfig;
-use crate::tunnel::handle_client_connection;
 use clap::Parser;
+use ppaass_agent::handle_client_connection;
+use ppaass_agent::AgentConfig;
+use ppaass_agent::Command;
 use ppaass_common::config::ServerConfig;
 use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
@@ -14,11 +14,6 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tracing::{debug, error};
-mod command;
-mod config;
-mod error;
-
-mod tunnel;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;

@@ -3,6 +3,14 @@ name = "agent"
 version = "0.1.0"
 edition = "2021"
 
+[[bin]]
+path = "src/bin/start.rs"
+name = "agent"
+
+[lib]
+path = "src/lib.rs"
+name = "ppaass_agent"
+
 [dependencies]
 ppaass-common = { path = "../common", package = "common" }
 hyper = { workspace = true, features = ["full"] }
