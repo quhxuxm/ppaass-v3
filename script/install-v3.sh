@@ -56,6 +56,7 @@ sudo cp /ppaass-v3/sourcecode/ppaass-v3/script/concrete-start-proxy.sh /ppaass-v
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/tool /ppaass-v3/build/ppaass-v3-tool
 
 sudo chmod 777 /ppaass-v3/build
+sudo chmod 777 /ppaass-v3/sourcecode/ppaass-v3/script/*
 cd /ppaass-v3/build
 ls -l
 
