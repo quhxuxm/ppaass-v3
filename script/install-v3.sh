@@ -60,6 +60,7 @@ cd /ppaass-v3/build
 ls -l
 
 sudo chmod 777 ppaass-v3-proxy
+sudo chmod 777 tool
 sudo chmod 777 *.sh
 sudo dos2unix ./start-proxy.sh
 sudo dos2unix ./concrete-start-proxy.sh
