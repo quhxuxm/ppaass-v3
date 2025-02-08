@@ -1,11 +1,12 @@
 use accessory::Accessors;
-use ppaass_common::config::{ConnectionPoolConfig, ServerConfig};
+use ppaass_common::config::{ConnectionPoolConfig, RsaCryptoRepoConfig, ServerConfig};
+use ppaass_common::crypto::{DEFAULT_AGENT_PRIVATE_KEY_PATH, DEFAULT_PROXY_PUBLIC_KEY_PATH};
 use ppaass_common::error::CommonError;
 use ppaass_common::{
     parse_to_socket_addresses, ProxyTcpConnectionInfo, ProxyTcpConnectionInfoSelector,
 };
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 #[derive(Serialize, Deserialize, Debug, Accessors)]
 pub struct AgentConfig {
     ip_v6: bool,
@@ -17,11 +18,10 @@ pub struct AgentConfig {
     log_name_prefix: String,
     #[access(get(ty=&str))]
     max_log_level: String,
-    #[access(get)]
     rsa_dir: PathBuf,
     #[access(get)]
     proxy_addresses: Vec<String>,
-    #[access(get(ty=&str))]
+    #[access(get)]
     authentication: String,
     #[access(get(cp))]
     agent_to_proxy_data_relay_buffer_size: usize,
@@ -33,6 +33,18 @@ pub struct AgentConfig {
     proxy_connect_timeout: u64,
     #[access(get)]
     connection_pool: Option<ConnectionPoolConfig>,
+}
+
+impl RsaCryptoRepoConfig for AgentConfig {
+    fn rsa_dir(&self) -> &Path {
+        &self.rsa_dir
+    }
+    fn public_key_name(&self) -> &str {
+        DEFAULT_PROXY_PUBLIC_KEY_PATH
+    }
+    fn private_key_name(&self) -> &str {
+        DEFAULT_AGENT_PRIVATE_KEY_PATH
+    }
 }
 
 impl ServerConfig for AgentConfig {

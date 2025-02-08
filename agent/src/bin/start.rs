@@ -13,8 +13,7 @@ use tracing::error;
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-const USER_SERVER_PUBLIC_KEY: &str = "ProxyPublicKey.pem";
-const USER_AGENT_PRIVATE_KEY: &str = "AgentPrivateKey.pem";
+
 const DEFAULT_CONFIG_FILE: &str = "resources/config.toml";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,12 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Arc::new(toml::from_str::<AgentConfig>(&config_file_content)?);
     let log_dir = command.log_dir.unwrap_or(config.log_dir().clone());
     let _log_guard = init_logger(&log_dir, config.log_name_prefix(), config.max_log_level())?;
-    let rsa_dir = command.rsa.unwrap_or(config.rsa_dir().clone());
-    let rsa_crypto_repo = Arc::new(FileSystemRsaCryptoRepo::new(
-        &rsa_dir,
-        USER_SERVER_PUBLIC_KEY,
-        USER_AGENT_PRIVATE_KEY,
-    )?);
+    let rsa_crypto_repo = Arc::new(FileSystemRsaCryptoRepo::new(config.as_ref())?);
 
     let runtime = Builder::new_multi_thread()
         .enable_all()

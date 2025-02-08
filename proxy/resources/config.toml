@@ -4,7 +4,7 @@ worker_thread_number = 256
 log_dir = "log"
 log_name_prefix = "ppaass-proxy-v3"
 max_log_level = "error"
-agent_rsa_dir = "resources/agent_rsa"
+rsa_dir = "resources/agent_rsa"
 proxy_to_destination_data_relay_buffer_size = 32768
 destination_to_proxy_data_relay_buffer_size = 32768
 destination_connect_timeout = 10
@@ -12,12 +12,13 @@ agent_frame_buffer_size = 262144
 # Forward
 [forward]
 rsa_dir = "resources/forward_rsa"
+authentication = "proxy_forward_user1"
 proxy_connect_timeout = 10
 proxy_frame_buffer_size = 262144
 proxies = [
-    { proxy_addresses = ["127.0.0.1:10091"], proxy_auth = "proxy_forward_user1" },
-    { proxy_addresses = ["127.0.0.1:10092"], proxy_auth = "proxy_forward_user1" },
-    { proxy_addresses = ["127.0.0.1:10093"], proxy_auth = "proxy_forward_user1" }
+    { proxy_addresses = ["127.0.0.1:10091"] },
+    { proxy_addresses = ["127.0.0.1:10092"] },
+    { proxy_addresses = ["127.0.0.1:10093"] }
 ]
 [forward.connection_pool]
 max_pool_size = 32

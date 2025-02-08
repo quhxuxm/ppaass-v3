@@ -16,6 +16,7 @@ use crate::tunnel::handle_agent_connection;
 use std::fs::read_to_string;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
+use ppaass_common::config::RsaCryptoRepoConfig;
 use ppaass_common::error::CommonError;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -24,11 +25,6 @@ use tokio_tfo::TfoListener;
 use tracing::{debug, error, trace};
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
-const USER_AGENT_PUBLIC_KEY: &str = "AgentPublicKey.pem";
-const USER_PROXY_PRIVATE_KEY: &str = "ProxyPrivateKey.pem";
-
-const FORWARD_USER_AGENT_PRIVATE_KEY: &str = "AgentPrivateKey.pem";
-const FORWARD_USER_PROXY_PUBLIC_KEY: &str = "ProxyPublicKey.pem";
 
 const DEFAULT_CONFIG_FILE: &str = "resources/config.toml";
 
@@ -67,13 +63,8 @@ async fn start_server(
     let mut server_state = ServerState::new();
     server_state.add_value(agent_rsa_crypto_repo.clone());
     if let Some(forward_config) = config.forward() {
-        let forward_rsa_dir = forward_config.rsa_dir();
         let forward_proxy_rsa_crypto_repo = Arc::new(ForwardProxyRsaCryptoRepository::new(
-            FileSystemRsaCryptoRepo::new(
-                forward_rsa_dir,
-                FORWARD_USER_PROXY_PUBLIC_KEY,
-                FORWARD_USER_AGENT_PRIVATE_KEY,
-            )?,
+            FileSystemRsaCryptoRepo::new(forward_config)?,
         ));
         trace!(
             "Success to create forward proxy rsa crypto repo: {forward_proxy_rsa_crypto_repo:?}"
@@ -105,15 +96,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Arc::new(toml::from_str::<ProxyConfig>(&config_file_content)?);
     let log_dir = command.log_dir.unwrap_or(config.log_dir().clone());
     let _log_guard = init_logger(&log_dir, config.log_name_prefix(), config.max_log_level())?;
-    let rsa_dir = command
-        .agent_rsa_dir
-        .unwrap_or(config.agent_rsa_dir().clone());
+    let rsa_dir = command.agent_rsa_dir.unwrap_or(config.rsa_dir().to_owned());
     debug!("Rsa directory of the proxy server: {rsa_dir:?}");
-    let rsa_crypto_repo = Arc::new(FileSystemRsaCryptoRepo::new(
-        &rsa_dir,
-        USER_AGENT_PUBLIC_KEY,
-        USER_PROXY_PRIVATE_KEY,
-    )?);
+    let rsa_crypto_repo = Arc::new(FileSystemRsaCryptoRepo::new(config.as_ref())?);
     trace!("Success to create agent_rsa crypto repo: {rsa_crypto_repo:?}");
     let runtime = Builder::new_multi_thread()
         .enable_all()

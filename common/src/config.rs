@@ -1,5 +1,12 @@
 use crate::ProxyTcpConnectionPoolConfig;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
+pub trait RsaCryptoRepoConfig {
+    fn rsa_dir(&self) -> &Path;
+    fn public_key_name(&self) -> &str;
+    fn private_key_name(&self) -> &str;
+}
+
 pub trait ServerConfig {
     fn worker_thread_number(&self) -> usize;
     fn server_port(&self) -> u16;

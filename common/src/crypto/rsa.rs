@@ -1,17 +1,22 @@
 use crate::error::CommonError;
 use hyper::body::Bytes;
-use rsa::rand_core::OsRng;
+pub use rsa::rand_core::OsRng;
 use rsa::{
-    pkcs8::{DecodePrivateKey, DecodePublicKey, EncodePrivateKey, EncodePublicKey, LineEnding},
+    pkcs8::{DecodePrivateKey, DecodePublicKey},
     Pkcs1v15Encrypt,
 };
-use rsa::{RsaPrivateKey, RsaPublicKey};
-use std::{fmt::Debug, path::Path};
-use std::{fs, io::Read};
-const DEFAULT_AGENT_PRIVATE_KEY_PATH: &str = "AgentPrivateKey.pem";
-const DEFAULT_AGENT_PUBLIC_KEY_PATH: &str = "AgentPublicKey.pem";
-const DEFAULT_PROXY_PRIVATE_KEY_PATH: &str = "ProxyPrivateKey.pem";
-const DEFAULT_PROXY_PUBLIC_KEY_PATH: &str = "ProxyPublicKey.pem";
+pub use rsa::{RsaPrivateKey, RsaPublicKey};
+
+pub use rsa::pkcs8::EncodePrivateKey;
+pub use rsa::pkcs8::EncodePublicKey;
+pub use rsa::pkcs8::LineEnding;
+use std::fmt::Debug;
+use std::io::Read;
+pub const DEFAULT_AGENT_PRIVATE_KEY_PATH: &str = "AgentPrivateKey.pem";
+pub const DEFAULT_AGENT_PUBLIC_KEY_PATH: &str = "AgentPublicKey.pem";
+pub const DEFAULT_PROXY_PRIVATE_KEY_PATH: &str = "ProxyPrivateKey.pem";
+pub const DEFAULT_PROXY_PUBLIC_KEY_PATH: &str = "ProxyPublicKey.pem";
+
 /// The util to do RSA encryption and decryption.
 #[derive(Debug)]
 pub struct RsaCrypto {
@@ -58,64 +63,4 @@ impl RsaCrypto {
             .map_err(|e| CommonError::Rsa(format!("Fail to decrypt with agent_rsa: {e:?}")))?;
         Ok(result.into())
     }
-}
-
-/// Generate the key pairs for agent
-pub fn generate_agent_key_pairs(base_dir: &str, auth_token: &str) -> Result<(), CommonError> {
-    let private_key_path = format!("{base_dir}/{auth_token}/{DEFAULT_AGENT_PRIVATE_KEY_PATH}");
-    let private_key_path = Path::new(private_key_path.as_str());
-    let public_key_path = format!("{base_dir}/{auth_token}/{DEFAULT_AGENT_PUBLIC_KEY_PATH}");
-    let public_key_path = Path::new(public_key_path.as_str());
-    generate_rsa_key_pairs(private_key_path, public_key_path)
-}
-
-/// Generate the key pairs for proxy
-pub fn generate_proxy_key_pairs(base_dir: &str, auth_token: &str) -> Result<(), CommonError> {
-    let private_key_path = format!("{base_dir}/{auth_token}/{DEFAULT_PROXY_PRIVATE_KEY_PATH}");
-    let private_key_path = Path::new(private_key_path.as_str());
-    let public_key_path = format!("{base_dir}/{auth_token}/{DEFAULT_PROXY_PUBLIC_KEY_PATH}");
-    let public_key_path = Path::new(public_key_path.as_str());
-    generate_rsa_key_pairs(private_key_path, public_key_path)
-}
-fn generate_rsa_key_pairs(
-    private_key_path: &Path,
-    public_key_path: &Path,
-) -> Result<(), CommonError> {
-    let private_key = RsaPrivateKey::new(&mut OsRng, 2048).expect("Fail to generate private key");
-    let public_key = RsaPublicKey::from(&private_key);
-    let private_key_pem = private_key
-        .to_pkcs8_pem(LineEnding::CRLF)
-        .expect("Fail to generate pem for private key.");
-    let public_key_pem = public_key
-        .to_public_key_pem(LineEnding::CRLF)
-        .expect("Fail to generate pem for public key.");
-    match private_key_path.parent() {
-        None => {
-            println!("Write private key: {:?}", private_key_path.to_str());
-            fs::write(private_key_path, private_key_pem.as_bytes())?;
-        }
-        Some(parent) => {
-            if !parent.exists() {
-                println!("Create parent directory :{:?}", parent.to_str());
-                fs::create_dir_all(parent)?;
-            }
-            println!("Write private key: {:?}", private_key_path.to_str());
-            fs::write(private_key_path, private_key_pem.as_bytes())?;
-        }
-    };
-    match public_key_path.parent() {
-        None => {
-            println!("Write public key: {:?}", public_key_path.to_str());
-            fs::write(public_key_path, public_key_pem.as_bytes())?;
-        }
-        Some(parent) => {
-            if !parent.exists() {
-                println!("Create parent directory :{:?}", parent.to_str());
-                fs::create_dir_all(parent)?;
-            }
-            println!("Write public key: {:?}", public_key_path.to_str());
-            fs::write(public_key_path, public_key_pem.as_bytes())?;
-        }
-    };
-    Ok(())
 }
