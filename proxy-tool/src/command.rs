@@ -4,7 +4,7 @@ use std::path::PathBuf;
 #[command(version, about, long_about = None)]
 pub struct ToolCommand {
     #[arg(short, long)]
-    pub config_file: PathBuf,
+    pub proxy_config_file: Option<PathBuf>,
     #[clap(subcommand)]
     pub sub_command: ToolSubCommand,
 }
@@ -15,5 +15,7 @@ pub enum ToolSubCommand {
     GenerateRsa {
         #[arg(short, long)]
         authentication: String,
+        #[arg(short, long)]
+        agent_rsa_dir: Option<PathBuf>,
     },
 }

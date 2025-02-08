@@ -1,5 +1,5 @@
 [workspace]
-members = ["agent", "common", "protocol", "proxy", "tool"]
+members = ["agent", "common", "protocol", "proxy", "proxy-tool"]
 resolver = "2"
 
 [profile.release]

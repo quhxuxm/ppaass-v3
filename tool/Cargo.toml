@@ -1,9 +1,0 @@
-[package]
-name = "tool"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-ppaass-common = { path = "../common", package = "common" }
-clap = { workspace = true, features = ["derive"] }
-anyhow = { workspace = true }

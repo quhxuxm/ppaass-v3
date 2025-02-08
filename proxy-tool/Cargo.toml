@@ -1,0 +1,17 @@
+[package]
+name = "proxy-tool"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+[[bin]]
+path = "src/bin/start.rs"
+name = "tool"
+
+[dependencies]
+ppaass-common = { path = "../common", package = "common" }
+clap = { workspace = true, features = ["derive"] }
+anyhow = { workspace = true }
+toml = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
