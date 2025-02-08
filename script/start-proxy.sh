@@ -8,6 +8,7 @@ do
     else
         echo "Found ppaass-v3-proxy process: $process_id"
         kill -9 $process_id
+        echo "Kill ppaass-v3-proxy process: $process_id"
         break
     fi
     a=`expr $a + 1`
