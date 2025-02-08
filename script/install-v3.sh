@@ -44,7 +44,7 @@ cd /ppaass-v3/sourcecode/ppaass-v3
 sudo git pull
 
 cd core
-cargo build --release --package proxy
+cargo build --release --package proxy --package proxy-tool
 
 # ps -ef | grep gradle | grep -v grep | awk '{print $2}' | xargs kill -9
 sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/* /ppaass-v3/build/resources
@@ -53,6 +53,7 @@ sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/forward_rsa/* /ppaass
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/proxy /ppaass-v3/build/ppaass-v3-proxy
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/script/start-proxy.sh /ppaass-v3/build/
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/script/concrete-start-proxy.sh /ppaass-v3/build/
+sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/tool /ppaass-v3/build/ppaass-v3-tool
 
 sudo chmod 777 /ppaass-v3/build
 cd /ppaass-v3/build
