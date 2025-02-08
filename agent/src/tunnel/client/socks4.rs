@@ -12,5 +12,7 @@ pub async fn socks4_protocol_proxy(
     _server_state: Arc<ServerState>,
 ) -> Result<(), CommonError> {
     debug!("Client connect to agent with socks 4 protocol: {client_socket_addr}");
-    unimplemented!("Socks 4 protocol is not yet implemented");
+    Err(CommonError::Other(
+        "Socks4 proxy is not supported".to_owned(),
+    ))
 }
