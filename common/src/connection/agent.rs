@@ -4,8 +4,10 @@ use crate::connection::codec::{
 
 use crate::connection::CryptoLengthDelimitedFramed;
 use crate::error::CommonError;
+use crate::user::repo::fs::USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME;
 use crate::user::UserInfoRepository;
 use crate::{random_generate_encryption, rsa_decrypt_encryption, rsa_encrypt_encryption};
+use chrono::{DateTime, Utc};
 use futures_util::{Sink, StreamExt};
 use futures_util::{SinkExt, Stream};
 use ppaass_protocol::{
@@ -79,6 +81,13 @@ impl AgentTcpConnection<AgentTcpConnectionNewState> {
         let user_info = user_info_repo
             .get_user(&authentication)?
             .ok_or(CommonError::RsaCryptoNotFound(authentication.clone()))?;
+        let user_expired_time = user_info
+            .get_additional_info::<DateTime<Utc>>(USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME);
+        if let Some(user_expired_time) = user_expired_time {
+            if Utc::now() > *user_expired_time.as_ref() {
+                return Err(CommonError::UserExpired(authentication));
+            }
+        }
         let agent_encryption =
             rsa_decrypt_encryption(&encryption, user_info.rsa_crypto())?.into_owned();
         let proxy_encryption = random_generate_encryption();

@@ -16,6 +16,8 @@ pub enum CommonError {
     ParseLogLevel(#[from] ParseLevelError),
     #[error("Can not find agent_user crypto with key: {0}")]
     RsaCryptoNotFound(String),
+    #[error("User expired: {0}")]
+    UserExpired(String),
     #[error("Connection exhausted: {0}")]
     ConnectionExhausted(SocketAddr),
     #[error(transparent)]
