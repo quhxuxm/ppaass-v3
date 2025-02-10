@@ -19,5 +19,9 @@ pub enum ToolSubCommand {
         agent_rsa_dir: Option<PathBuf>,
         #[arg(short, long)]
         temp_dir: Option<PathBuf>,
+        #[arg(short, long)]
+        expire_after_days: Option<i64>,
+        #[arg(short, long)]
+        proxy_servers: Option<Vec<String>>,
     },
 }

@@ -20,12 +20,16 @@ fn main() -> Result<()> {
             username,
             agent_rsa_dir,
             temp_dir,
+            expire_after_days,
+            proxy_servers,
         } => generate_user(
             config.as_ref(),
             GenerateUserHandlerArgument {
                 username,
                 agent_rsa_dir,
                 temp_dir,
+                expire_after_days,
+                proxy_servers,
             },
         )?,
     }

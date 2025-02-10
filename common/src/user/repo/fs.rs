@@ -23,6 +23,8 @@ pub struct FileSystemUserInfoConfig {
     pub public_key_file_relative_path: PathBuf,
     #[access(get(ty = &std::path::Path))]
     pub private_key_file_relative_path: PathBuf,
+    #[access(get)]
+    pub proxy_servers: Option<Vec<String>>,
 }
 
 #[derive(Debug)]

@@ -1,6 +1,7 @@
 use crate::config::ProxyToolConfig;
 use crate::crypto::{generate_agent_key_pairs, generate_proxy_key_pairs};
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use std::net::SocketAddr;
 use std::ops::Add;
 
 use chrono::{TimeDelta, Utc};
@@ -8,9 +9,11 @@ use ppaass_common::crypto::{
     DEFAULT_AGENT_PRIVATE_KEY_PATH, DEFAULT_AGENT_PUBLIC_KEY_PATH, DEFAULT_PROXY_PRIVATE_KEY_PATH,
     DEFAULT_PROXY_PUBLIC_KEY_PATH,
 };
+use ppaass_common::error::CommonError;
 use ppaass_common::generate_uuid;
 use ppaass_common::user::repo::fs::{FileSystemUserInfoConfig, FS_USER_INFO_CONFIG_FILE_NAME};
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 const DEFAULT_SEND_TO_AGENT_DIR: &str = "send_to_agent";
 const DEFAULT_TEMP_DIR: &str = "temp";
 
@@ -18,6 +21,8 @@ pub struct GenerateUserHandlerArgument {
     pub username: String,
     pub temp_dir: Option<PathBuf>,
     pub agent_rsa_dir: Option<PathBuf>,
+    pub expire_after_days: Option<i64>,
+    pub proxy_servers: Option<Vec<String>>,
 }
 pub fn generate_user(config: &ProxyToolConfig, arg: GenerateUserHandlerArgument) -> Result<()> {
     let temp_dir = &arg
@@ -54,9 +59,13 @@ pub fn generate_user(config: &ProxyToolConfig, arg: GenerateUserHandlerArgument)
         "Begin to generate proxy user info configuration file for: {}",
         &arg.username
     );
-    let proxy_user_expired_date_time = Utc::now().add(TimeDelta::days(1));
+    let expired_date_time = match arg.expire_after_days {
+        None => None,
+        Some(days) => Some(Utc::now().add(TimeDelta::days(days))),
+    };
     let proxy_user_info = FileSystemUserInfoConfig {
-        expired_date_time: Some(proxy_user_expired_date_time),
+        expired_date_time,
+        proxy_servers: None,
         description: None,
         email: None,
         public_key_file_relative_path: PathBuf::from(DEFAULT_AGENT_PUBLIC_KEY_PATH),
@@ -101,10 +110,20 @@ pub fn generate_user(config: &ProxyToolConfig, arg: GenerateUserHandlerArgument)
         &arg.username
     );
 
+    if let Some(proxy_servers) = &arg.proxy_servers {
+        for proxy_server in proxy_servers {
+            if let Err(e) = SocketAddr::from_str(&proxy_server) {
+                eprintln!("Failed to parse proxy server: {proxy_server}");
+                return Err(anyhow!("Fail to parse proxy server address: {e:?}"));
+            }
+        }
+    }
+
     let agent_user_info = FileSystemUserInfoConfig {
         expired_date_time: None,
         description: None,
         email: None,
+        proxy_servers: arg.proxy_servers,
         public_key_file_relative_path: PathBuf::from(DEFAULT_PROXY_PUBLIC_KEY_PATH),
         private_key_file_relative_path: PathBuf::from(DEFAULT_AGENT_PRIVATE_KEY_PATH),
     };
