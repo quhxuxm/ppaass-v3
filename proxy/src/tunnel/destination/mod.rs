@@ -1,11 +1,11 @@
 mod tcp;
 mod udp;
-use crate::crypto::ForwardProxyRsaCryptoRepository;
+use crate::user::ForwardProxyUserRepository;
 use crate::ForwardConfig;
 use ppaass_common::config::ConnectionPoolConfig;
-use ppaass_common::crypto::RsaCryptoRepository;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
+use ppaass_common::user::UserInfoRepository;
 use ppaass_common::{
     ProxyTcpConnection, ProxyTcpConnectionInfo, ProxyTcpConnectionPool,
     ProxyTcpConnectionRelayState, TunnelInitRequest, UnifiedAddress,
@@ -35,22 +35,17 @@ impl DestinationEdge {
     pub async fn start_forward<T>(
         server_state: &ServerState,
         proxy_tcp_connection_info: ProxyTcpConnectionInfo,
-        forward_rsa_crypto_repo: &T,
+        forward_user_repo: &T,
         destination_address: UnifiedAddress,
     ) -> Result<Self, CommonError>
     where
-        T: RsaCryptoRepository + Send + Sync + 'static,
+        T: UserInfoRepository + Send + Sync + 'static,
     {
         let proxy_tcp_connection = match server_state.get_value::<Arc<
-            ProxyTcpConnectionPool<
-                ConnectionPoolConfig,
-                ForwardConfig,
-                ForwardProxyRsaCryptoRepository,
-            >,
+            ProxyTcpConnectionPool<ConnectionPoolConfig, ForwardConfig, ForwardProxyUserRepository>,
         >>() {
             None => {
-                ProxyTcpConnection::create(proxy_tcp_connection_info, forward_rsa_crypto_repo)
-                    .await?
+                ProxyTcpConnection::create(proxy_tcp_connection_info, forward_user_repo).await?
             }
             Some(pool) => pool.take_proxy_connection().await?,
         };

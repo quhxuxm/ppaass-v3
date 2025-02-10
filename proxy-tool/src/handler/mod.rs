@@ -1,1 +1,1 @@
-pub mod generate_rsa;
+pub mod generate_user;

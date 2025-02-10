@@ -1,9 +1,10 @@
 use crate::connection::codec::{
     HandshakeRequestDecoder, HandshakeResponseEncoder, TunnelControlRequestResponseCodec,
 };
+
 use crate::connection::CryptoLengthDelimitedFramed;
-use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
+use crate::user::UserInfoRepository;
 use crate::{random_generate_encryption, rsa_decrypt_encryption, rsa_encrypt_encryption};
 use futures_util::{Sink, StreamExt};
 use futures_util::{SinkExt, Stream};
@@ -59,12 +60,12 @@ impl AgentTcpConnection<AgentTcpConnectionNewState> {
     pub async fn create<T, R>(
         agent_tcp_stream: T,
         agent_socket_address: SocketAddr,
-        rsa_crypto_repo: &R,
+        user_info_repo: &R,
         frame_buffer_size: usize,
     ) -> Result<AgentTcpConnection<AgentTcpConnectionTunnelCtlState<T>>, CommonError>
     where
         T: AsyncRead + AsyncWrite + Send + Sync + Unpin + 'static,
-        R: RsaCryptoRepository + Sync + Send + 'static,
+        R: UserInfoRepository + Sync + Send + 'static,
     {
         let mut handshake_request_framed =
             Framed::new(agent_tcp_stream, HandshakeRequestDecoder::new());
@@ -75,12 +76,14 @@ impl AgentTcpConnection<AgentTcpConnectionNewState> {
             .next()
             .await
             .ok_or(CommonError::ConnectionExhausted(agent_socket_address))??;
-        let rsa_crypto = rsa_crypto_repo
-            .get_rsa_crypto(&authentication)?
+        let user_info = user_info_repo
+            .get_user(&authentication)?
             .ok_or(CommonError::RsaCryptoNotFound(authentication.clone()))?;
-        let agent_encryption = rsa_decrypt_encryption(&encryption, &rsa_crypto)?.into_owned();
+        let agent_encryption =
+            rsa_decrypt_encryption(&encryption, user_info.rsa_crypto())?.into_owned();
         let proxy_encryption = random_generate_encryption();
-        let encrypted_proxy_encryption = rsa_encrypt_encryption(&proxy_encryption, &rsa_crypto)?;
+        let encrypted_proxy_encryption =
+            rsa_encrypt_encryption(&proxy_encryption, user_info.rsa_crypto())?;
         let handshake_response = HandshakeResponse {
             encryption: encrypted_proxy_encryption.into_owned(),
         };

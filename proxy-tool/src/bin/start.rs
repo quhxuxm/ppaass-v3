@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use proxy_tool::command::{ToolCommand, ToolSubCommand};
 use proxy_tool::config::ProxyToolConfig;
-use proxy_tool::handler::generate_rsa::{generate_rsa, GenerateRsaHandlerArgument};
+use proxy_tool::handler::generate_user::{generate_user, GenerateUserHandlerArgument};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -16,14 +16,16 @@ fn main() -> Result<()> {
     let config_file_content = read_to_string(config_file_path)?;
     let config = Arc::new(toml::from_str::<ProxyToolConfig>(&config_file_content)?);
     match command.sub_command {
-        ToolSubCommand::GenerateRsa {
-            authentication,
+        ToolSubCommand::GenerateUser {
+            username,
             agent_rsa_dir,
-        } => generate_rsa(
+            temp_dir,
+        } => generate_user(
             config.as_ref(),
-            GenerateRsaHandlerArgument {
-                authentication,
+            GenerateUserHandlerArgument {
+                username,
                 agent_rsa_dir,
+                temp_dir,
             },
         )?,
     }

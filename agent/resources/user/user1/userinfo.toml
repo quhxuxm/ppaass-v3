@@ -1,0 +1,2 @@
+public_key_file_relative_path = "ProxyPublicKey.pem"
+private_key_file_relative_path = "AgentPrivateKey.pem"

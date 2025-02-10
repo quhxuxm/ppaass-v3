@@ -5,9 +5,9 @@ mod tunnel;
 pub use command::Command;
 pub use config::AgentConfig;
 use ppaass_common::config::ServerConfig;
-use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::{CommonServer, Server, ServerListener, ServerState};
+use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
 use ppaass_common::ProxyTcpConnectionPool;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
@@ -45,14 +45,14 @@ async fn create_server_listener(config: Arc<AgentConfig>) -> Result<ServerListen
 
 pub async fn start_server(
     config: Arc<AgentConfig>,
-    rsa_crypto_repo: Arc<FileSystemRsaCryptoRepo>,
+    user_repo: Arc<FileSystemUserInfoRepository>,
 ) -> Result<(), CommonError> {
     let mut server_state = ServerState::new();
-    server_state.add_value(rsa_crypto_repo.clone());
+    server_state.add_value(user_repo.clone());
     if let Some(connection_pool_config) = config.connection_pool() {
         let proxy_tcp_connection_pool = ProxyTcpConnectionPool::new(
             Arc::new(connection_pool_config.clone()),
-            rsa_crypto_repo.clone(),
+            user_repo.clone(),
             config.clone(),
         )
         .await?;

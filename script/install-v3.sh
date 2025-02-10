@@ -34,8 +34,8 @@ sudo mkdir /ppaass-v3
 sudo mkdir /ppaass-v3/sourcecode
 sudo mkdir /ppaass-v3/build
 sudo mkdir /ppaass-v3/build/resources
-sudo mkdir /ppaass-v3/build/resources/agent_rsa
-sudo mkdir /ppaass-v3/build/resources/forward_rsa
+sudo mkdir /ppaass-v3/build/resources/agent_user
+sudo mkdir /ppaass-v3/build/resources/forward_user
 # Pull ppaass
 cd /ppaass-v3/sourcecode
 sudo git clone -b main https://github.com/quhxuxm/ppaass-v3.git ppaass-v3
@@ -48,8 +48,8 @@ cargo build --release --package proxy --package proxy-tool
 
 # ps -ef | grep gradle | grep -v grep | awk '{print $2}' | xargs kill -9
 sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/* /ppaass-v3/build/resources
-sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/agent_rsa/* /ppaass-v3/build/resources/agent_rsa
-sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/forward_rsa/* /ppaass-v3/build/resources/forward_rsa
+sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/agent_user/* /ppaass-v3/build/resources/agent_user
+sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/forward_user/* /ppaass-v3/build/resources/forward_user
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/proxy /ppaass-v3/build/ppaass-v3-proxy
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/tool /ppaass-v3/build/ppaass-v3-tool
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/script/* /ppaass-v3/build/

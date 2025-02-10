@@ -3,6 +3,7 @@ mod connection;
 pub mod crypto;
 pub mod error;
 pub mod server;
+pub mod user;
 use crate::crypto::{generate_aes_encryption_token, generate_blowfish_encryption_token, RsaCrypto};
 use crate::error::CommonError;
 pub use connection::*;

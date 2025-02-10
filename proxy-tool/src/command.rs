@@ -11,11 +11,13 @@ pub struct ToolCommand {
 
 #[derive(Debug, Subcommand)]
 pub enum ToolSubCommand {
-    #[command(name = "gen-rsa")]
-    GenerateRsa {
+    #[command(name = "gen-user")]
+    GenerateUser {
         #[arg(short, long)]
-        authentication: String,
+        username: String,
         #[arg(short, long)]
         agent_rsa_dir: Option<PathBuf>,
+        #[arg(short, long)]
+        temp_dir: Option<PathBuf>,
     },
 }

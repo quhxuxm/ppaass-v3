@@ -7,24 +7,16 @@ use ppaass_common::error::CommonError;
 use std::fs;
 use std::path::Path;
 /// Generate the key pairs for agent
-pub fn generate_agent_key_pairs(base_dir: &Path, auth_token: &str) -> Result<(), CommonError> {
-    let private_key_path = base_dir
-        .join(auth_token)
-        .join(DEFAULT_AGENT_PRIVATE_KEY_PATH);
-    let public_key_path = base_dir
-        .join(auth_token)
-        .join(DEFAULT_AGENT_PUBLIC_KEY_PATH);
+pub fn generate_agent_key_pairs(base_dir: &Path, username: &str) -> Result<(), CommonError> {
+    let private_key_path = base_dir.join(username).join(DEFAULT_AGENT_PRIVATE_KEY_PATH);
+    let public_key_path = base_dir.join(username).join(DEFAULT_AGENT_PUBLIC_KEY_PATH);
     generate_rsa_key_pairs(&private_key_path, &public_key_path)
 }
 
 /// Generate the key pairs for proxy
-pub fn generate_proxy_key_pairs(base_dir: &Path, auth_token: &str) -> Result<(), CommonError> {
-    let private_key_path = base_dir
-        .join(auth_token)
-        .join(DEFAULT_PROXY_PRIVATE_KEY_PATH);
-    let public_key_path = base_dir
-        .join(auth_token)
-        .join(DEFAULT_PROXY_PUBLIC_KEY_PATH);
+pub fn generate_proxy_key_pairs(base_dir: &Path, username: &str) -> Result<(), CommonError> {
+    let private_key_path = base_dir.join(username).join(DEFAULT_PROXY_PRIVATE_KEY_PATH);
+    let public_key_path = base_dir.join(username).join(DEFAULT_PROXY_PUBLIC_KEY_PATH);
     generate_rsa_key_pairs(&private_key_path, &public_key_path)
 }
 fn generate_rsa_key_pairs(

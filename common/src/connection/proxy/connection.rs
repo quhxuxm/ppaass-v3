@@ -3,9 +3,9 @@ use crate::connection::codec::{
 };
 
 use crate::connection::CryptoLengthDelimitedFramed;
-use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
 
+use crate::user::UserInfoRepository;
 use crate::{random_generate_encryption, rsa_decrypt_encryption, rsa_encrypt_encryption};
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
@@ -92,10 +92,10 @@ impl<T> ProxyTcpConnection<T> {
 impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
     pub async fn create<R>(
         proxy_tcp_connection_info: ProxyTcpConnectionInfo,
-        rsa_crypto_repo: &R,
+        user_info_repo: &R,
     ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError>
     where
-        R: RsaCryptoRepository + Sync + Send + 'static,
+        R: UserInfoRepository + Sync + Send + 'static,
     {
         let proxy_address_index =
             random::<u64>() % proxy_tcp_connection_info.proxy_addresses.len() as u64;
@@ -110,12 +110,13 @@ impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
         proxy_tcp_stream.set_linger(None)?;
         let proxy_socket_address = proxy_tcp_stream.peer_addr()?;
         let agent_encryption = random_generate_encryption();
-        let rsa_crypto = rsa_crypto_repo
-            .get_rsa_crypto(proxy_tcp_connection_info.authentication())?
+        let user_info = user_info_repo
+            .get_user(proxy_tcp_connection_info.authentication())?
             .ok_or(CommonError::RsaCryptoNotFound(
                 proxy_tcp_connection_info.authentication().to_owned(),
             ))?;
-        let encrypt_agent_encryption = rsa_encrypt_encryption(&agent_encryption, &rsa_crypto)?;
+        let encrypt_agent_encryption =
+            rsa_encrypt_encryption(&agent_encryption, user_info.rsa_crypto())?;
         let mut handshake_request_framed =
             Framed::new(proxy_tcp_stream, HandshakeRequestEncoder::new());
         let handshake_request = HandshakeRequest {
@@ -139,7 +140,8 @@ impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
             .await
             .ok_or(CommonError::ConnectionExhausted(proxy_socket_address))??;
         debug!("Success to receive handshake response from proxy: {proxy_socket_address:?}");
-        let proxy_encryption = rsa_decrypt_encryption(&proxy_encryption, &rsa_crypto)?.into_owned();
+        let proxy_encryption =
+            rsa_decrypt_encryption(&proxy_encryption, user_info.rsa_crypto())?.into_owned();
         let FramedParts {
             io: proxy_tcp_stream,
             ..

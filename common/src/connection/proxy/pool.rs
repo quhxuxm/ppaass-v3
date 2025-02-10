@@ -1,5 +1,5 @@
-use crate::crypto::RsaCryptoRepository;
 use crate::error::CommonError;
+use crate::user::UserInfoRepository;
 use crate::{ProxyTcpConnection, ProxyTcpConnectionInfo, ProxyTcpConnectionTunnelCtlState};
 use chrono::{DateTime, Utc};
 use std::cmp::Ordering;
@@ -10,7 +10,6 @@ use tokio::sync::mpsc::channel;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tracing::{debug, error};
-
 pub trait ProxyTcpConnectionInfoSelector {
     fn select_proxy_tcp_connection_info(&self) -> Result<ProxyTcpConnectionInfo, CommonError>;
 }
@@ -64,30 +63,30 @@ pub struct ProxyTcpConnectionPool<C, S, R>
 where
     C: ProxyTcpConnectionPoolConfig + Debug + Send + Sync + 'static,
     S: ProxyTcpConnectionInfoSelector + Send + Sync + 'static,
-    R: RsaCryptoRepository + Sync + Send + 'static,
+    R: UserInfoRepository + Sync + Send + 'static,
 {
     /// The pool to store the proxy connection
     pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
     config: Arc<C>,
-    rsa_crypto_repo: Arc<R>,
+    user_repo: Arc<R>,
     proxy_tcp_connection_info_selector: Arc<S>,
 }
 impl<C, S, R> ProxyTcpConnectionPool<C, S, R>
 where
     C: ProxyTcpConnectionPoolConfig + Debug + Send + Sync + 'static,
     S: ProxyTcpConnectionInfoSelector + Send + Sync + 'static,
-    R: RsaCryptoRepository + Sync + Send + 'static,
+    R: UserInfoRepository + Sync + Send + 'static,
 {
     /// Create the proxy connection pool
     pub async fn new(
         config: Arc<C>,
-        rsa_crypto_repo: Arc<R>,
+        user_repo: Arc<R>,
         proxy_tcp_connection_info_selector: Arc<S>,
     ) -> Result<Self, CommonError> {
         let pool = Arc::new(Mutex::new(Vec::new()));
         let interval = config.fill_interval();
         let pool_clone = pool.clone();
-        let rsa_crypto_repo_clone = rsa_crypto_repo.clone();
+        let user_repo_clone = user_repo.clone();
         let proxy_tcp_connection_info_selector_clone = proxy_tcp_connection_info_selector.clone();
         let config_clone = config.clone();
         tokio::spawn(async move {
@@ -96,7 +95,7 @@ where
                 Self::fill_pool(
                     pool_clone.clone(),
                     config_clone.clone(),
-                    rsa_crypto_repo_clone.clone(),
+                    user_repo_clone.clone(),
                     proxy_tcp_connection_info_selector_clone.clone(),
                 )
                 .await;
@@ -107,7 +106,7 @@ where
         Ok(Self {
             pool,
             config,
-            rsa_crypto_repo,
+            user_repo,
             proxy_tcp_connection_info_selector,
         })
     }
@@ -117,7 +116,7 @@ where
         Self::concrete_take_proxy_connection(
             self.pool.clone(),
             self.config.clone(),
-            self.rsa_crypto_repo.clone(),
+            self.user_repo.clone(),
             self.proxy_tcp_connection_info_selector.clone(),
         )
         .await
@@ -212,7 +211,7 @@ where
     async fn concrete_take_proxy_connection(
         pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
         config: Arc<C>,
-        rsa_crypto_repo: Arc<R>,
+        user_repo: Arc<R>,
         proxy_tcp_connection_info_selector: Arc<S>,
     ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
         let mut pool_lock = pool.lock().await;
@@ -227,14 +226,14 @@ where
                 Self::fill_pool(
                     pool.clone(),
                     config.clone(),
-                    rsa_crypto_repo.clone(),
+                    user_repo.clone(),
                     proxy_tcp_connection_info_selector.clone(),
                 )
                 .await;
                 Box::pin(Self::concrete_take_proxy_connection(
                     pool,
                     config,
-                    rsa_crypto_repo,
+                    user_repo,
                     proxy_tcp_connection_info_selector,
                 ))
                 .await
@@ -252,7 +251,7 @@ where
     async fn fill_pool(
         pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
         config: Arc<C>,
-        rsa_crypto_repo: Arc<R>,
+        user_repo: Arc<R>,
         proxy_tcp_connection_info_selector: Arc<S>,
     ) {
         let max_pool_size = config.max_pool_size();
@@ -269,7 +268,7 @@ where
             channel::<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>>(max_pool_size);
 
         for _ in pool_lock.len()..max_pool_size {
-            let rsa_crypto_repo = rsa_crypto_repo.clone();
+            let user_repo = user_repo.clone();
             let proxy_tcp_connection_tx = proxy_tcp_connection_tx.clone();
             let proxy_tcp_connection_info_selector = proxy_tcp_connection_info_selector.clone();
             tokio::spawn(async move {
@@ -283,8 +282,7 @@ where
                     }
                 };
                 debug!("Going to create proxy tcp connection with forward proxy address: {proxy_addresses:?}");
-                match ProxyTcpConnection::create(proxy_addresses.clone(), rsa_crypto_repo.as_ref())
-                    .await
+                match ProxyTcpConnection::create(proxy_addresses.clone(), user_repo.as_ref()).await
                 {
                     Ok(proxy_tcp_connection) => {
                         debug!("Create forward proxy tcp connection success: {proxy_addresses:?}");

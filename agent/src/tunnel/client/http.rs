@@ -7,7 +7,6 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response};
 use hyper_util::rt::TokioIo;
-use ppaass_common::crypto::FileSystemRsaCryptoRepo;
 use ppaass_common::error::CommonError;
 use ppaass_common::{
     ProxyTcpConnection, ProxyTcpConnectionInfoSelector, ProxyTcpConnectionPool, TunnelInitRequest,
@@ -16,6 +15,7 @@ use ppaass_common::{
 
 use ppaass_common::config::ConnectionPoolConfig;
 use ppaass_common::server::ServerState;
+use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio_tfo::TfoStream;
@@ -33,10 +33,10 @@ async fn client_http_request_handler(
     client_socket_addr: SocketAddr,
     client_http_request: Request<Incoming>,
 ) -> Result<Response<BoxBody<Bytes, hyper::Error>>, CommonError> {
-    let rsa_crypto_repo = server_state
-        .get_value::<Arc<FileSystemRsaCryptoRepo>>()
+    let user_repo = server_state
+        .get_value::<Arc<FileSystemUserInfoRepository>>()
         .ok_or(CommonError::Other(format!(
-            "Fail to get rsa crypto repository: {client_socket_addr}"
+            "Fail to get user crypto repository: {client_socket_addr}"
         )))?;
     let destination_uri = client_http_request.uri();
     let destination_host = destination_uri.host().ok_or(CommonError::Other(format!(
@@ -55,12 +55,14 @@ async fn client_http_request_handler(
         }
     };
     debug!("Receive client http request to destination: {destination_address:?}, client socket address: {client_socket_addr}");
-    let proxy_tcp_connection_pool = server_state.get_value::<Arc< ProxyTcpConnectionPool<ConnectionPoolConfig, AgentConfig, FileSystemRsaCryptoRepo>>>();
+    let proxy_tcp_connection_pool = server_state.get_value::<Arc<
+        ProxyTcpConnectionPool<ConnectionPoolConfig, AgentConfig, FileSystemUserInfoRepository>,
+    >>();
     let proxy_tcp_connection = match proxy_tcp_connection_pool {
         None => {
             ProxyTcpConnection::create(
                 config.select_proxy_tcp_connection_info()?,
-                rsa_crypto_repo.as_ref(),
+                user_repo.as_ref(),
             )
             .await?
         }
