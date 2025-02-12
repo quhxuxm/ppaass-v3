@@ -1,5 +1,7 @@
 use accessory::Accessors;
-use ppaass_common::config::{ConnectionPoolConfig, ServerConfig};
+use ppaass_common::config::{
+    ConnectionPoolConfig, ProxyTcpConnectionConfig, ServerConfig, UserInfoConfig,
+};
 use ppaass_common::error::CommonError;
 use ppaass_common::{
     parse_to_socket_addresses, ProxyTcpConnectionInfo, ProxyTcpConnectionInfoSelector,
@@ -55,31 +57,27 @@ pub struct ForwardProxyInfo {
 
 #[derive(Serialize, Deserialize, Accessors, Debug, Clone)]
 pub struct ForwardConfig {
-    #[access(get(cp))]
     proxy_connect_timeout: u64,
     #[access(get)]
     proxies: Vec<ForwardProxyInfo>,
     #[access(get(ty=&std::path::Path))]
     user_dir: PathBuf,
-    #[access(get)]
     authentication: String,
-    #[access(get(cp))]
     proxy_frame_buffer_size: usize,
     #[access(get)]
     connection_pool: Option<ConnectionPoolConfig>,
 }
+impl UserInfoConfig for ForwardConfig {
+    fn username(&self) -> &str {
+        &self.authentication
+    }
+}
 
-impl ProxyTcpConnectionInfoSelector for ForwardConfig {
-    fn select_proxy_tcp_connection_info(&self) -> Result<ProxyTcpConnectionInfo, CommonError> {
-        let select_index = random::<u64>() % self.proxies.len() as u64;
-        let forward_proxy_info = &self.proxies[select_index as usize];
-        let proxy_addresses =
-            parse_to_socket_addresses(forward_proxy_info.proxy_addresses().iter())?;
-        Ok(ProxyTcpConnectionInfo::new(
-            proxy_addresses,
-            self.authentication().to_owned(),
-            self.proxy_frame_buffer_size(),
-            self.proxy_connect_timeout(),
-        ))
+impl ProxyTcpConnectionConfig for ForwardConfig {
+    fn proxy_frame_size(&self) -> usize {
+        self.proxy_frame_buffer_size
+    }
+    fn proxy_connect_timeout(&self) -> u64 {
+        self.proxy_connect_timeout
     }
 }

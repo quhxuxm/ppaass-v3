@@ -63,6 +63,8 @@ async fn client_http_request_handler(
             ProxyTcpConnection::create(
                 config.select_proxy_tcp_connection_info()?,
                 user_repo.as_ref(),
+                config.proxy_frame_buffer_size(),
+                config.proxy_connect_timeout(),
             )
             .await?
         }

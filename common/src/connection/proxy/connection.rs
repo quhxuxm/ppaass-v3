@@ -5,7 +5,7 @@ use crate::connection::codec::{
 use crate::connection::CryptoLengthDelimitedFramed;
 use crate::error::CommonError;
 
-use crate::user::UserInfoRepository;
+use crate::user::{UserInfo, UserInfoRepository};
 use crate::{random_generate_encryption, rsa_decrypt_encryption, rsa_encrypt_encryption};
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
@@ -13,7 +13,7 @@ use ppaass_protocol::{
     Encryption, HandshakeRequest, HandshakeResponse, HeartbeatRequest, TunnelControlRequest,
     TunnelControlResponse, TunnelInitFailureReason, TunnelInitRequest, TunnelInitResponse,
 };
-use rand::random;
+
 use std::fmt::{Debug, Formatter};
 use std::io::Error;
 use std::net::SocketAddr;
@@ -42,36 +42,21 @@ pub struct ProxyTcpConnectionRelayState {
 }
 #[derive(Debug, Clone)]
 pub struct ProxyTcpConnectionInfo {
-    proxy_addresses: Vec<SocketAddr>,
+    proxy_address: SocketAddr,
     authentication: String,
-    frame_buffer_size: usize,
-    connect_timeout: u64,
 }
 impl ProxyTcpConnectionInfo {
-    pub fn new(
-        proxy_addresses: Vec<SocketAddr>,
-        authentication: String,
-        frame_buffer_size: usize,
-        connect_timeout: u64,
-    ) -> Self {
+    pub fn new(proxy_address: SocketAddr, authentication: String) -> Self {
         Self {
-            proxy_addresses,
+            proxy_address,
             authentication,
-            frame_buffer_size,
-            connect_timeout,
         }
     }
     pub fn authentication(&self) -> &str {
         &self.authentication
     }
-    pub fn proxy_addresses(&self) -> &[SocketAddr] {
-        &self.proxy_addresses
-    }
-    pub fn frame_buffer_size(&self) -> usize {
-        self.frame_buffer_size
-    }
-    pub fn connect_timeout(&self) -> u64 {
-        self.connect_timeout
+    pub fn proxy_address(&self) -> SocketAddr {
+        self.proxy_address
     }
 }
 pub struct ProxyTcpConnection<T> {
@@ -90,31 +75,21 @@ impl<T> ProxyTcpConnection<T> {
     }
 }
 impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
-    pub async fn create<R>(
+    pub async fn create(
         proxy_tcp_connection_info: ProxyTcpConnectionInfo,
-        user_info_repo: &R,
-    ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError>
-    where
-        R: UserInfoRepository + Sync + Send + 'static,
-    {
-        let proxy_address_index =
-            random::<u64>() % proxy_tcp_connection_info.proxy_addresses.len() as u64;
+        user_info: &UserInfo,
+        frame_buffer_size: usize,
+        connect_timeout: u64,
+    ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
         let proxy_tcp_stream = timeout(
-            Duration::from_secs(proxy_tcp_connection_info.connect_timeout()),
-            TfoStream::connect(
-                proxy_tcp_connection_info.proxy_addresses()[proxy_address_index as usize],
-            ),
+            Duration::from_secs(connect_timeout),
+            TfoStream::connect(proxy_tcp_connection_info.proxy_address()),
         )
         .await??;
         proxy_tcp_stream.set_nodelay(true)?;
         proxy_tcp_stream.set_linger(None)?;
         let proxy_socket_address = proxy_tcp_stream.peer_addr()?;
         let agent_encryption = random_generate_encryption();
-        let user_info = user_info_repo
-            .get_user(proxy_tcp_connection_info.authentication())?
-            .ok_or(CommonError::RsaCryptoNotFound(
-                proxy_tcp_connection_info.authentication().to_owned(),
-            ))?;
         let encrypt_agent_encryption =
             rsa_encrypt_encryption(&agent_encryption, user_info.rsa_crypto())?;
         let mut handshake_request_framed =
@@ -156,11 +131,11 @@ impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
                 tunnel_ctl_response_request_framed: Framed::with_capacity(
                     proxy_tcp_stream,
                     TunnelControlResponseRequestCodec::new(proxy_encryption, agent_encryption),
-                    proxy_tcp_connection_info.frame_buffer_size(),
+                    frame_buffer_size,
                 ),
             },
             proxy_socket_address,
-            frame_buffer_size: proxy_tcp_connection_info.frame_buffer_size(),
+            frame_buffer_size,
         })
     }
 }

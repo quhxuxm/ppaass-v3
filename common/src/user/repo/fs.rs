@@ -10,9 +10,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tracing::error;
 pub const USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME: &str = "expired_date_time";
+pub const USER_INFO_ADDITION_INFO_PROXY_SERVERS: &str = "proxy_servers";
 pub const FS_USER_INFO_CONFIG_FILE_NAME: &str = "userinfo.toml";
 #[derive(Debug, Serialize, Deserialize, Accessors)]
 pub struct FileSystemUserInfoConfig {
+    #[access(get)]
+    pub username: String,
     #[access(get)]
     pub expired_date_time: Option<DateTime<Utc>>,
     #[access(get)]
@@ -26,12 +29,10 @@ pub struct FileSystemUserInfoConfig {
     #[access(get)]
     pub proxy_servers: Option<Vec<String>>,
 }
-
 #[derive(Debug)]
 pub struct FileSystemUserInfoRepository {
     user_info_storage: HashMap<String, Arc<UserInfo>>,
 }
-
 impl FileSystemUserInfoRepository {
     pub fn new(user_repo_dir_path: &Path) -> Result<Self, CommonError> {
         let mut user_info_storage = HashMap::new();
@@ -85,13 +86,17 @@ impl FileSystemUserInfoRepository {
                 return;
             };
             let mut user_info = UserInfo::new(rsa_crypto);
-            user_info.add_additional_info(USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME, Utc::now());
+            if let Some(expired_date_time) = user_info_config.expired_date_time() {
+                user_info.add_additional_info(USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME, expired_date_time.to_owned());
+            }
+            if let Some(proxy_servers) =user_info_config.proxy_servers() {
+                user_info.add_additional_info(USER_INFO_ADDITION_INFO_PROXY_SERVERS, proxy_servers.to_owned());
+            }
             user_info_storage.insert(username.to_string(), Arc::new(user_info));
         });
         Ok(Self { user_info_storage })
     }
 }
-
 impl UserInfoRepository for FileSystemUserInfoRepository {
     fn get_user(&self, username: &str) -> Result<Option<Arc<UserInfo>>, CommonError> {
         match self.user_info_storage.get(username) {

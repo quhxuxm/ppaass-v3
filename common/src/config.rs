@@ -1,5 +1,21 @@
-use crate::ProxyTcpConnectionPoolConfig;
 use serde::{Deserialize, Serialize};
+
+pub trait UserInfoConfig {
+    fn username(&self) -> &str;
+}
+
+pub trait ProxyTcpConnectionPoolConfig {
+    fn max_pool_size(&self) -> usize;
+    fn fill_interval(&self) -> u64;
+    fn check_interval(&self) -> u64;
+    fn connection_max_alive(&self) -> i64;
+    fn heartbeat_timeout(&self) -> u64;
+}
+
+pub trait ProxyTcpConnectionConfig {
+    fn proxy_frame_size(&self) -> usize;
+    fn proxy_connect_timeout(&self) -> u64;
+}
 
 pub trait ServerConfig {
     fn worker_thread_number(&self) -> usize;
