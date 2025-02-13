@@ -5,7 +5,7 @@ use crate::connection::codec::{
 use crate::connection::CryptoLengthDelimitedFramed;
 use crate::error::CommonError;
 
-use crate::user::{UserInfo, UserInfoRepository};
+use crate::user::UserInfo;
 use crate::{random_generate_encryption, rsa_decrypt_encryption, rsa_encrypt_encryption};
 use chrono::Utc;
 use futures_util::{SinkExt, StreamExt};
@@ -14,6 +14,7 @@ use ppaass_protocol::{
     TunnelControlResponse, TunnelInitFailureReason, TunnelInitRequest, TunnelInitResponse,
 };
 
+use crate::connection::proxy::select_proxy_tcp_connection_info;
 use std::fmt::{Debug, Formatter};
 use std::io::Error;
 use std::net::SocketAddr;
@@ -76,11 +77,12 @@ impl<T> ProxyTcpConnection<T> {
 }
 impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
     pub async fn create(
-        proxy_tcp_connection_info: ProxyTcpConnectionInfo,
+        username: &str,
         user_info: &UserInfo,
         frame_buffer_size: usize,
         connect_timeout: u64,
     ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
+        let proxy_tcp_connection_info = select_proxy_tcp_connection_info(username, user_info)?;
         let proxy_tcp_stream = timeout(
             Duration::from_secs(connect_timeout),
             TfoStream::connect(proxy_tcp_connection_info.proxy_address()),

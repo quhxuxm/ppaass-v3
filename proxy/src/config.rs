@@ -1,12 +1,9 @@
 use accessory::Accessors;
 use ppaass_common::config::{
-    ConnectionPoolConfig, ProxyTcpConnectionConfig, ServerConfig, UserInfoConfig,
+    DefaultConnectionPoolConfig, ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig,
+    ServerConfig, UserInfoConfig,
 };
-use ppaass_common::error::CommonError;
-use ppaass_common::{
-    parse_to_socket_addresses, ProxyTcpConnectionInfo, ProxyTcpConnectionInfoSelector,
-};
-use rand::random;
+
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Accessors, Debug)]
@@ -50,26 +47,18 @@ impl ServerConfig for ProxyConfig {
 }
 
 #[derive(Serialize, Deserialize, Accessors, Debug, Clone)]
-pub struct ForwardProxyInfo {
-    #[access(get)]
-    pub proxy_addresses: Vec<String>,
-}
-
-#[derive(Serialize, Deserialize, Accessors, Debug, Clone)]
 pub struct ForwardConfig {
     proxy_connect_timeout: u64,
-    #[access(get)]
-    proxies: Vec<ForwardProxyInfo>,
     #[access(get(ty=&std::path::Path))]
     user_dir: PathBuf,
-    authentication: String,
+    username: String,
     proxy_frame_buffer_size: usize,
     #[access(get)]
-    connection_pool: Option<ConnectionPoolConfig>,
+    connection_pool: Option<DefaultConnectionPoolConfig>,
 }
 impl UserInfoConfig for ForwardConfig {
     fn username(&self) -> &str {
-        &self.authentication
+        &self.username
     }
 }
 
@@ -79,5 +68,38 @@ impl ProxyTcpConnectionConfig for ForwardConfig {
     }
     fn proxy_connect_timeout(&self) -> u64 {
         self.proxy_connect_timeout
+    }
+}
+
+impl ProxyTcpConnectionPoolConfig for ForwardConfig {
+    fn max_pool_size(&self) -> usize {
+        match &self.connection_pool {
+            None => 0,
+            Some(pool_config) => pool_config.max_pool_size(),
+        }
+    }
+    fn fill_interval(&self) -> u64 {
+        match &self.connection_pool {
+            None => 0,
+            Some(pool_config) => pool_config.fill_interval(),
+        }
+    }
+    fn check_interval(&self) -> u64 {
+        match &self.connection_pool {
+            None => 0,
+            Some(pool_config) => pool_config.check_interval(),
+        }
+    }
+    fn connection_max_alive(&self) -> i64 {
+        match &self.connection_pool {
+            None => 0,
+            Some(pool_config) => pool_config.connection_max_alive(),
+        }
+    }
+    fn heartbeat_timeout(&self) -> u64 {
+        match &self.connection_pool {
+            None => 0,
+            Some(pool_config) => pool_config.heartbeat_timeout(),
+        }
     }
 }

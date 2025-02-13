@@ -9,13 +9,13 @@ use hyper::{Method, Request, Response};
 use hyper_util::rt::TokioIo;
 use ppaass_common::error::CommonError;
 use ppaass_common::{
-    ProxyTcpConnection, ProxyTcpConnectionInfoSelector, ProxyTcpConnectionPool, TunnelInitRequest,
-    UnifiedAddress,
+    ProxyTcpConnection, ProxyTcpConnectionPool, TunnelInitRequest, UnifiedAddress,
 };
 
-use ppaass_common::config::ConnectionPoolConfig;
 use ppaass_common::server::ServerState;
-use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
+
+use ppaass_common::config::{ProxyTcpConnectionConfig, UserInfoConfig};
+use ppaass_common::user::UserInfo;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio_tfo::TfoStream;
@@ -29,15 +29,11 @@ fn success_empty_body() -> BoxBody<Bytes, hyper::Error> {
 
 async fn client_http_request_handler(
     config: &AgentConfig,
+    user_info: &UserInfo,
     server_state: Arc<ServerState>,
     client_socket_addr: SocketAddr,
     client_http_request: Request<Incoming>,
 ) -> Result<Response<BoxBody<Bytes, hyper::Error>>, CommonError> {
-    let user_repo = server_state
-        .get_value::<Arc<FileSystemUserInfoRepository>>()
-        .ok_or(CommonError::Other(format!(
-            "Fail to get user crypto repository: {client_socket_addr}"
-        )))?;
     let destination_uri = client_http_request.uri();
     let destination_host = destination_uri.host().ok_or(CommonError::Other(format!(
         "Can not find destination host: {destination_uri}, client socket address: {client_socket_addr}"
@@ -55,15 +51,14 @@ async fn client_http_request_handler(
         }
     };
     debug!("Receive client http request to destination: {destination_address:?}, client socket address: {client_socket_addr}");
-    let proxy_tcp_connection_pool = server_state.get_value::<Arc<
-        ProxyTcpConnectionPool<ConnectionPoolConfig, AgentConfig, FileSystemUserInfoRepository>,
-    >>();
+    let proxy_tcp_connection_pool =
+        server_state.get_value::<Arc<ProxyTcpConnectionPool<AgentConfig>>>();
     let proxy_tcp_connection = match proxy_tcp_connection_pool {
         None => {
             ProxyTcpConnection::create(
-                config.select_proxy_tcp_connection_info()?,
-                user_repo.as_ref(),
-                config.proxy_frame_buffer_size(),
+                config.username(),
+                user_info,
+                config.proxy_frame_size(),
                 config.proxy_connect_timeout(),
             )
             .await?
@@ -152,15 +147,22 @@ async fn client_http_request_handler(
 pub async fn http_protocol_proxy(
     client_tcp_stream: TfoStream,
     client_socket_addr: SocketAddr,
-    config: Arc<AgentConfig>,
+    config: &AgentConfig,
+    user_info: &UserInfo,
     server_state: Arc<ServerState>,
 ) -> Result<(), CommonError> {
     let client_tcp_io = TokioIo::new(client_tcp_stream);
     let service_fn = ServiceBuilder::new().service(service_fn(|request| {
         let server_state = server_state.clone();
         async {
-            client_http_request_handler(config.as_ref(), server_state, client_socket_addr, request)
-                .await
+            client_http_request_handler(
+                config,
+                user_info,
+                server_state,
+                client_socket_addr,
+                request,
+            )
+            .await
         }
     }));
     http1::Builder::new()

@@ -1,10 +1,6 @@
 use crate::error::CommonError;
-use crate::user::repo::fs::USER_INFO_ADDITION_INFO_PROXY_SERVERS;
 use crate::user::UserInfo;
-use crate::{
-    parse_to_socket_addresses, ProxyTcpConnection, ProxyTcpConnectionInfo,
-    ProxyTcpConnectionTunnelCtlState,
-};
+use crate::{ProxyTcpConnection, ProxyTcpConnectionTunnelCtlState};
 use chrono::{DateTime, Utc};
 use std::cmp::Ordering;
 use std::fmt::Debug;
@@ -16,87 +12,8 @@ use tokio::sync::mpsc::channel;
 use tokio::sync::Mutex;
 use tokio::time::sleep;
 use tracing::{debug, error};
-pub trait ProxyTcpConnectionInfoSelector {
-    fn select_proxy_tcp_connection_info(
-        &self,
-        username: &str,
-        user_info: &UserInfo,
-    ) -> Result<ProxyTcpConnectionInfo, CommonError> {
-        let proxy_addresses = user_info
-            .get_additional_info::<Vec<String>>(USER_INFO_ADDITION_INFO_PROXY_SERVERS)
-            .ok_or(CommonError::Other(format!(
-                "No proxy servers defined in user info configuration: {user_info:?}"
-            )))?;
-        let proxy_addresses = parse_to_socket_addresses(proxy_addresses.iter())?;
-
-        let select_index = rand::random::<u64>() % proxy_addresses.len() as u64;
-        let proxy_address = proxy_addresses[select_index as usize];
-
-        Ok(ProxyTcpConnectionInfo::new(
-            proxy_address,
-            username.to_owned(),
-        ))
-    }
-}
-
 #[derive(Debug)]
-struct ProxyTcpConnectionPoolElement<C, T>
-where
-    C: ProxyTcpConnectionPoolConfig + UserInfoConfig + Debug + Send + Sync + 'static,
-    T: ProxyTcpConnectionConfig + UserInfoConfig + Debug + Send + Sync + 'static,
-{
-    proxy_tcp_connection: ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>,
-    create_time: DateTime<Utc>,
-    last_check_time: DateTime<Utc>,
-    last_check_duration: i64,
-    pool_config: Arc<C>,
-    connection_config: Arc<T>,
-}
-impl<C, T> ProxyTcpConnectionPoolElement<C, T>
-where
-    C: ProxyTcpConnectionPoolConfig + UserInfoConfig + Debug + Send + Sync + 'static,
-    T: ProxyTcpConnectionConfig + UserInfoConfig + Debug + Send + Sync + 'static,
-{
-    pub fn new(
-        proxy_tcp_connection: ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>,
-        pool_config: Arc<C>,
-        connection_config: Arc<T>,
-    ) -> Self {
-        Self {
-            proxy_tcp_connection,
-            last_check_time: Utc::now(),
-            create_time: Utc::now(),
-            last_check_duration: 0,
-            pool_config,
-            connection_config,
-        }
-    }
-    pub fn need_check(&self) -> bool {
-        let now = Utc::now();
-        let delta = now - self.last_check_time;
-        delta.num_seconds() > self.pool_config.check_interval() as i64
-    }
-    pub fn need_close(&self) -> bool {
-        let now = Utc::now();
-        let delta = now - self.create_time;
-        delta.num_seconds() > self.pool_config.connection_max_alive()
-    }
-}
-/// The connection pool for proxy connection.
-pub struct ProxyTcpConnectionPool<C, T, S>
-where
-    C: ProxyTcpConnectionPoolConfig + UserInfoConfig + Debug + Send + Sync + 'static,
-    T: ProxyTcpConnectionConfig + UserInfoConfig + Debug + Send + Sync + 'static,
-    S: ProxyTcpConnectionInfoSelector + Send + Sync + 'static,
-{
-    /// The pool to store the proxy connection
-    pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C, T>>>>,
-    pool_config: Arc<C>,
-    connection_config: Arc<T>,
-    user_info: Arc<UserInfo>,
-    proxy_tcp_connection_info_selector: Arc<S>,
-}
-impl<C, T, S> ProxyTcpConnectionPool<C, T, S>
+struct ProxyTcpConnectionPoolElement<C>
 where
     C: ProxyTcpConnectionPoolConfig
         + ProxyTcpConnectionConfig
@@ -105,42 +22,96 @@ where
         + Send
         + Sync
         + 'static,
-    T: ProxyTcpConnectionConfig + UserInfoConfig + Debug + Send + Sync + 'static,
-    S: ProxyTcpConnectionInfoSelector + Send + Sync + 'static,
+{
+    proxy_tcp_connection: ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>,
+    create_time: DateTime<Utc>,
+    last_check_time: DateTime<Utc>,
+    last_check_duration: i64,
+    config: Arc<C>,
+}
+impl<C> ProxyTcpConnectionPoolElement<C>
+where
+    C: ProxyTcpConnectionPoolConfig
+        + ProxyTcpConnectionConfig
+        + UserInfoConfig
+        + Debug
+        + Send
+        + Sync
+        + 'static,
+{
+    pub fn new(
+        proxy_tcp_connection: ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>,
+        config: Arc<C>,
+    ) -> Self {
+        Self {
+            proxy_tcp_connection,
+            last_check_time: Utc::now(),
+            create_time: Utc::now(),
+            last_check_duration: 0,
+            config,
+        }
+    }
+    pub fn need_check(&self) -> bool {
+        let now = Utc::now();
+        let delta = now - self.last_check_time;
+        delta.num_seconds() > self.config.check_interval() as i64
+    }
+    pub fn need_close(&self) -> bool {
+        let now = Utc::now();
+        let delta = now - self.create_time;
+        delta.num_seconds() > self.config.connection_max_alive()
+    }
+}
+/// The connection pool for proxy connection.
+pub struct ProxyTcpConnectionPool<C>
+where
+    C: ProxyTcpConnectionPoolConfig
+        + ProxyTcpConnectionConfig
+        + UserInfoConfig
+        + Debug
+        + Send
+        + Sync
+        + 'static,
+{
+    /// The pool to store the proxy connection
+    pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
+    config: Arc<C>,
+    user_info: Arc<UserInfo>,
+}
+impl<C> ProxyTcpConnectionPool<C>
+where
+    C: ProxyTcpConnectionPoolConfig
+        + ProxyTcpConnectionConfig
+        + UserInfoConfig
+        + Debug
+        + Send
+        + Sync
+        + 'static,
 {
     /// Create the proxy connection pool
-    pub async fn new(
-        pool_config: Arc<C>,
-        connection_config: Arc<T>,
-        user_info: Arc<UserInfo>,
-        proxy_tcp_connection_info_selector: Arc<S>,
-    ) -> Result<Self, CommonError> {
+    pub async fn new(config: Arc<C>, user_info: Arc<UserInfo>) -> Result<Self, CommonError> {
         let pool = Arc::new(Mutex::new(Vec::new()));
-        let interval = pool_config.fill_interval();
+        let interval = config.fill_interval();
         let pool_clone = pool.clone();
         let user_info_clone = user_info.clone();
-        let proxy_tcp_connection_info_selector_clone = proxy_tcp_connection_info_selector.clone();
-        let pool_config_clone = pool_config.clone();
+        let config_clone = config.clone();
         tokio::spawn(async move {
             loop {
                 debug!("Starting connection pool auto filling loop.");
                 Self::fill_pool(
                     pool_clone.clone(),
-                    pool_config_clone.clone(),
+                    config_clone.clone(),
                     user_info_clone.clone(),
-                    proxy_tcp_connection_info_selector_clone.clone(),
                 )
                 .await;
                 sleep(Duration::from_secs(interval)).await;
             }
         });
-        Self::start_connection_check_task(pool_config_clone.clone(), pool.clone());
+        Self::start_connection_check_task(config.clone(), pool.clone());
         Ok(Self {
             pool,
-            pool_config,
-            connection_config,
+            config,
             user_info,
-            proxy_tcp_connection_info_selector,
         })
     }
     pub async fn take_proxy_connection(
@@ -150,7 +121,6 @@ where
             self.pool.clone(),
             self.config.clone(),
             self.user_info.clone(),
-            self.proxy_tcp_connection_info_selector.clone(),
         )
         .await
     }
@@ -169,9 +139,8 @@ where
     }
 
     fn start_connection_check_task(
-        pool_config: Arc<C>,
-        connection_config: Arc<T>,
-        pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C, T>>>>,
+        config: Arc<C>,
+        pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
     ) {
         tokio::spawn(async move {
             loop {
@@ -181,7 +150,8 @@ where
                     pool_lock.len()
                 );
                 let (checking_tx, mut checking_rx) =
-                    channel::<ProxyTcpConnectionPoolElement<C, T>>(pool_config.max_pool_size());
+                    channel::<ProxyTcpConnectionPoolElement<C>>(config.max_pool_size());
+                channel::<ProxyTcpConnectionPoolElement<C>>(config.max_pool_size());
                 'for_each_connection: loop {
                     let mut proxy_tcp_connection_pool_element = match pool_lock.pop() {
                         None => break 'for_each_connection,
@@ -200,11 +170,11 @@ where
                         continue 'for_each_connection;
                     }
                     let checking_tx = checking_tx.clone();
-                    let pool_config = pool_config.clone();
+                    let config = config.clone();
                     tokio::spawn(async move {
                         if let Err(e) = Self::check_proxy_connection(
                             &mut proxy_tcp_connection_pool_element,
-                            &pool_config,
+                            &config,
                         )
                         .await
                         {
@@ -218,7 +188,7 @@ where
                 }
                 drop(checking_tx);
                 while let Some(mut proxy_connection) = checking_rx.recv().await {
-                    if pool_lock.len() >= pool_config.max_pool_size() {
+                    if pool_lock.len() >= config.max_pool_size() {
                         tokio::spawn(async move {
                             if let Err(e) = proxy_connection.proxy_tcp_connection.close().await {
                                 error!("Failed to close proxy connection: {}", e);
@@ -237,17 +207,15 @@ where
                     }
                 });
                 drop(pool_lock);
-                sleep(Duration::from_secs(pool_config.check_interval())).await;
+                sleep(Duration::from_secs(config.check_interval())).await;
             }
         });
     }
     /// The concrete take proxy connection implementation
     async fn concrete_take_proxy_connection(
-        pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C, T>>>>,
-        pool_config: Arc<C>,
-        connection_config: Arc<T>,
+        pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
+        config: Arc<C>,
         user_info: Arc<UserInfo>,
-        proxy_tcp_connection_info_selector: Arc<S>,
     ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
         let mut pool_lock = pool.lock().await;
         debug!(
@@ -258,19 +226,9 @@ where
         match proxy_tcp_connection_element {
             None => {
                 drop(pool_lock);
-                Self::fill_pool(
-                    pool.clone(),
-                    pool_config.clone(),
-                    user_info.clone(),
-                    proxy_tcp_connection_info_selector.clone(),
-                )
-                .await;
+                Self::fill_pool(pool.clone(), config.clone(), user_info.clone()).await;
                 Box::pin(Self::concrete_take_proxy_connection(
-                    pool,
-                    pool_config,
-                    connection_config,
-                    user_info,
-                    proxy_tcp_connection_info_selector,
+                    pool, config, user_info,
                 ))
                 .await
             }
@@ -285,13 +243,11 @@ where
     }
     /// Fill the pool with proxy connection
     async fn fill_pool(
-        pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C, T>>>>,
-        pool_config: Arc<C>,
-        connection_config: Arc<T>,
+        pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
+        config: Arc<C>,
         user_info: Arc<UserInfo>,
-        proxy_tcp_connection_info_selector: Arc<S>,
     ) {
-        let max_pool_size = pool_config.max_pool_size();
+        let max_pool_size = config.max_pool_size();
         let mut pool_lock = pool.lock().await;
         if pool_lock.len() >= max_pool_size {
             debug!("Cancel filling proxy connection pool, because the pool size exceed max, current pool size: {}, max pool size: {}", pool_lock.len(), max_pool_size);
@@ -306,22 +262,12 @@ where
 
         for _ in pool_lock.len()..max_pool_size {
             let proxy_tcp_connection_tx = proxy_tcp_connection_tx.clone();
-            let proxy_tcp_connection_info_selector = proxy_tcp_connection_info_selector.clone();
+
             let user_info = user_info.clone();
-            let pool_config = pool_config.clone();
+            let config = config.clone();
             tokio::spawn(async move {
-                let proxy_addresses = match proxy_tcp_connection_info_selector
-                    .select_proxy_tcp_connection_info(pool_config.username(), user_info.as_ref())
-                {
-                    Ok(info) => info,
-                    Err(e) => {
-                        error!("Fail to create proxy tcp connection because of error happen on select proxy address: {e:?}");
-                        return;
-                    }
-                };
-                debug!("Going to create proxy tcp connection with forward proxy address: {proxy_addresses:?}");
                 match ProxyTcpConnection::create(
-                    proxy_addresses.clone(),
+                    config.username(),
                     user_info.as_ref(),
                     config.proxy_frame_size(),
                     config.proxy_connect_timeout(),
@@ -329,13 +275,12 @@ where
                 .await
                 {
                     Ok(proxy_tcp_connection) => {
-                        debug!("Create forward proxy tcp connection success: {proxy_addresses:?}");
                         if let Err(e) = proxy_tcp_connection_tx.send(proxy_tcp_connection).await {
                             error!("Fail to send proxy tcp connection: {e:?}")
                         }
                     }
                     Err(e) => {
-                        error!("Failed to create proxy connection [{proxy_addresses:?}]: {e}");
+                        error!("Failed to create proxy connection: {e}");
                     }
                 }
             });

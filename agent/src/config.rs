@@ -1,10 +1,12 @@
 use accessory::Accessors;
 use ppaass_common::config::{
-    ConnectionPoolConfig, ProxyTcpConnectionConfig, ServerConfig, UserInfoConfig,
+    DefaultConnectionPoolConfig, ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig,
+    ServerConfig, UserInfoConfig,
 };
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
 #[derive(Serialize, Deserialize, Debug, Accessors)]
 pub struct AgentConfig {
     ip_v6: bool,
@@ -23,12 +25,10 @@ pub struct AgentConfig {
     agent_to_proxy_data_relay_buffer_size: usize,
     #[access(get(cp))]
     proxy_to_agent_data_relay_buffer_size: usize,
-
     proxy_frame_buffer_size: usize,
-
     proxy_connect_timeout: u64,
     #[access(get)]
-    connection_pool: Option<ConnectionPoolConfig>,
+    connection_pool: Option<DefaultConnectionPoolConfig>,
 }
 impl UserInfoConfig for AgentConfig {
     fn username(&self) -> &str {
@@ -42,6 +42,39 @@ impl ProxyTcpConnectionConfig for AgentConfig {
     }
     fn proxy_connect_timeout(&self) -> u64 {
         self.proxy_connect_timeout
+    }
+}
+
+impl ProxyTcpConnectionPoolConfig for AgentConfig {
+    fn max_pool_size(&self) -> usize {
+        match self.connection_pool {
+            Some(ref pool) => pool.max_pool_size(),
+            None => 0,
+        }
+    }
+    fn fill_interval(&self) -> u64 {
+        match self.connection_pool {
+            Some(ref pool) => pool.fill_interval(),
+            None => 0,
+        }
+    }
+    fn check_interval(&self) -> u64 {
+        match self.connection_pool {
+            Some(ref pool) => pool.check_interval(),
+            None => 0,
+        }
+    }
+    fn connection_max_alive(&self) -> i64 {
+        match self.connection_pool {
+            Some(ref pool) => pool.connection_max_alive(),
+            None => 0,
+        }
+    }
+    fn heartbeat_timeout(&self) -> u64 {
+        match self.connection_pool {
+            Some(ref pool) => pool.heartbeat_timeout(),
+            None => 0,
+        }
     }
 }
 

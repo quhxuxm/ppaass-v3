@@ -1,14 +1,13 @@
 mod tcp;
 mod udp;
-use crate::user::ForwardProxyUserRepository;
 use crate::ForwardConfig;
-use ppaass_common::config::ConnectionPoolConfig;
+use ppaass_common::config::{ProxyTcpConnectionConfig, UserInfoConfig};
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
-use ppaass_common::user::UserInfoRepository;
+use ppaass_common::user::UserInfo;
 use ppaass_common::{
-    ProxyTcpConnection, ProxyTcpConnectionInfo, ProxyTcpConnectionPool,
-    ProxyTcpConnectionRelayState, TunnelInitRequest, UnifiedAddress,
+    ProxyTcpConnection, ProxyTcpConnectionPool, ProxyTcpConnectionRelayState, TunnelInitRequest,
+    UnifiedAddress,
 };
 use std::sync::Arc;
 pub use tcp::*;
@@ -32,26 +31,33 @@ impl DestinationEdge {
         Ok(Self::Tcp(destination_tcp_connection))
     }
 
-    pub async fn start_forward<T>(
+    pub async fn start_forward(
         server_state: &ServerState,
-        proxy_tcp_connection_info: ProxyTcpConnectionInfo,
-        forward_user_repo: &T,
+        forward_config: &ForwardConfig,
         destination_address: UnifiedAddress,
-    ) -> Result<Self, CommonError>
-    where
-        T: UserInfoRepository + Send + Sync + 'static,
-    {
-        let proxy_tcp_connection = match server_state.get_value::<Arc<
-            ProxyTcpConnectionPool<ConnectionPoolConfig, ForwardConfig, ForwardProxyUserRepository>,
-        >>() {
-            None => {
-                ProxyTcpConnection::create(proxy_tcp_connection_info, forward_user_repo).await?
-            }
-            Some(pool) => pool.take_proxy_connection().await?,
-        };
-        let proxy_socket_address = proxy_tcp_connection.proxy_socket_address();
+    ) -> Result<Self, CommonError> {
+        let user_info = server_state
+            .get_value::<Arc<UserInfo>>()
+            .ok_or(CommonError::Other(format!(
+                "Can not find forward user info: {}",
+                forward_config.username()
+            )))?;
+        let proxy_tcp_connection_pool =
+            match server_state.get_value::<Arc<ProxyTcpConnectionPool<ForwardConfig>>>() {
+                None => {
+                    ProxyTcpConnection::create(
+                        forward_config.username(),
+                        user_info,
+                        forward_config.proxy_frame_size(),
+                        forward_config.proxy_connect_timeout(),
+                    )
+                    .await?
+                }
+                Some(pool) => pool.take_proxy_connection().await?,
+            };
+        let proxy_socket_address = proxy_tcp_connection_pool.proxy_socket_address();
         debug!("Success to create forward proxy tcp connection: {proxy_socket_address}");
-        let proxy_tcp_connection = proxy_tcp_connection
+        let proxy_tcp_connection = proxy_tcp_connection_pool
             .tunnel_init(TunnelInitRequest::Tcp {
                 destination_address: destination_address.clone(),
                 keep_alive: false,

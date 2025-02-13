@@ -24,7 +24,7 @@ pub trait ServerConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ConnectionPoolConfig {
+pub struct DefaultConnectionPoolConfig {
     max_pool_size: usize,
     fill_interval: u64,
     check_interval: u64,
@@ -32,14 +32,13 @@ pub struct ConnectionPoolConfig {
     heartbeat_timeout: u64,
 }
 
-impl ProxyTcpConnectionPoolConfig for ConnectionPoolConfig {
+impl ProxyTcpConnectionPoolConfig for DefaultConnectionPoolConfig {
     fn max_pool_size(&self) -> usize {
         self.max_pool_size
     }
     fn fill_interval(&self) -> u64 {
         self.fill_interval
     }
-
     fn check_interval(&self) -> u64 {
         self.check_interval
     }

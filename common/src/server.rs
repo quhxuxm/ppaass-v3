@@ -8,7 +8,6 @@ use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio_tfo::{TfoListener, TfoStream};
 use tracing::{error, info};
-
 pub struct ServerState {
     values: HashMap<TypeId, Arc<dyn Any + Send + Sync + 'static>>,
 }
@@ -114,6 +113,7 @@ where
 
             let config = config.clone();
             let server_state = server_state.clone();
+
             let connection_handler = connection_handler.clone();
             tokio::spawn(async move {
                 if let Err(e) =

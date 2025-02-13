@@ -1,19 +1,18 @@
 use crate::config::ProxyToolConfig;
 use crate::crypto::{generate_agent_key_pairs, generate_proxy_key_pairs};
 use anyhow::{anyhow, Result};
-use std::net::SocketAddr;
-use std::ops::Add;
-
 use chrono::{TimeDelta, Utc};
 use ppaass_common::crypto::{
     DEFAULT_AGENT_PRIVATE_KEY_PATH, DEFAULT_AGENT_PUBLIC_KEY_PATH, DEFAULT_PROXY_PRIVATE_KEY_PATH,
     DEFAULT_PROXY_PUBLIC_KEY_PATH,
 };
-use ppaass_common::error::CommonError;
 use ppaass_common::generate_uuid;
 use ppaass_common::user::repo::fs::{FileSystemUserInfoConfig, FS_USER_INFO_CONFIG_FILE_NAME};
+use std::net::SocketAddr;
+use std::ops::Add;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+
 const DEFAULT_SEND_TO_AGENT_DIR: &str = "send_to_agent";
 const DEFAULT_TEMP_DIR: &str = "temp";
 
@@ -64,10 +63,10 @@ pub fn generate_user(config: &ProxyToolConfig, arg: GenerateUserHandlerArgument)
         Some(days) => Some(Utc::now().add(TimeDelta::days(days))),
     };
     let proxy_user_info = FileSystemUserInfoConfig {
+        username: arg.username.clone(),
         expired_date_time,
         proxy_servers: None,
         description: None,
-        email: None,
         public_key_file_relative_path: PathBuf::from(DEFAULT_AGENT_PUBLIC_KEY_PATH),
         private_key_file_relative_path: PathBuf::from(DEFAULT_PROXY_PRIVATE_KEY_PATH),
     };
@@ -120,9 +119,9 @@ pub fn generate_user(config: &ProxyToolConfig, arg: GenerateUserHandlerArgument)
     }
 
     let agent_user_info = FileSystemUserInfoConfig {
+        username: arg.username,
         expired_date_time: None,
         description: None,
-        email: None,
         proxy_servers: arg.proxy_servers,
         public_key_file_relative_path: PathBuf::from(DEFAULT_PROXY_PUBLIC_KEY_PATH),
         private_key_file_relative_path: PathBuf::from(DEFAULT_AGENT_PRIVATE_KEY_PATH),

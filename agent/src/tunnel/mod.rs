@@ -4,6 +4,7 @@ use crate::config::AgentConfig;
 pub use client::*;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::{ServerState, ServerTcpStream};
+use ppaass_common::user::UserInfo;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio_tfo::TfoStream;
@@ -30,13 +31,18 @@ pub async fn handle_client_connection(
         error!("Client tcp stream exhausted: {client_socket_addr}");
         return Err(CommonError::ConnectionExhausted(client_socket_addr));
     }
+    let user_info = server_state
+        .get_value::<Arc<UserInfo>>()
+        .ok_or(CommonError::Other("Can not get user info".to_owned()))?
+        .clone();
     match protocol[0] {
         SOCKS5_VERSION => {
             debug!("Client tcp stream using socks5 protocol: {client_socket_addr}");
             socks5_protocol_proxy(
                 TfoStream::from(client_tcp_stream),
                 client_socket_addr,
-                config,
+                &config,
+                &user_info,
                 server_state,
             )
             .await
@@ -46,7 +52,8 @@ pub async fn handle_client_connection(
             socks4_protocol_proxy(
                 TfoStream::from(client_tcp_stream),
                 client_socket_addr,
-                config,
+                &config,
+                &user_info,
                 server_state,
             )
             .await
@@ -56,7 +63,8 @@ pub async fn handle_client_connection(
             http_protocol_proxy(
                 TfoStream::from(client_tcp_stream),
                 client_socket_addr,
-                config,
+                &config,
+                &user_info,
                 server_state,
             )
             .await

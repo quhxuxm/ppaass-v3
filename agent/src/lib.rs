@@ -5,10 +5,11 @@ mod tunnel;
 
 pub use command::Command;
 pub use config::AgentConfig;
-use ppaass_common::config::ServerConfig;
+use ppaass_common::config::{ServerConfig, UserInfoConfig};
 use ppaass_common::error::CommonError;
 use ppaass_common::server::{CommonServer, Server, ServerListener, ServerState};
 use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
+use ppaass_common::user::UserInfoRepository;
 use ppaass_common::ProxyTcpConnectionPool;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
@@ -46,17 +47,16 @@ async fn create_server_listener(config: Arc<AgentConfig>) -> Result<ServerListen
 
 pub async fn start_server(
     config: Arc<AgentConfig>,
-    user_repo: Arc<FileSystemUserInfoRepository>,
+    user_repo: &FileSystemUserInfoRepository,
 ) -> Result<(), CommonError> {
     let mut server_state = ServerState::new();
-    server_state.add_value(user_repo.clone());
-    if let Some(connection_pool_config) = config.connection_pool() {
-        let proxy_tcp_connection_pool = ProxyTcpConnectionPool::new(
-            Arc::new(connection_pool_config.clone()),
-            user_repo.clone(),
-            config.clone(),
-        )
-        .await?;
+    let user_info = user_repo
+        .get_user(config.username())?
+        .ok_or(CommonError::Other("User not found".to_owned()))?;
+    server_state.add_value(user_info.clone());
+    if config.connection_pool().is_some() {
+        let proxy_tcp_connection_pool =
+            ProxyTcpConnectionPool::new(config.clone(), user_info.clone()).await?;
         server_state.add_value(Arc::new(proxy_tcp_connection_pool));
     }
     let server = CommonServer::new(config.clone(), server_state);

@@ -30,7 +30,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .worker_threads(config.worker_thread_number())
         .build()?;
     runtime.block_on(async move {
-        if let Err(e) = start_server(config, user_repo).await {
+        if let Err(e) = start_server(config, &user_repo).await {
             error!("Fail to start agent server: {e:?}")
         }
     });

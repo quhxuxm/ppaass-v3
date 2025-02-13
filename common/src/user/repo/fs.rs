@@ -20,8 +20,6 @@ pub struct FileSystemUserInfoConfig {
     pub expired_date_time: Option<DateTime<Utc>>,
     #[access(get)]
     pub description: Option<String>,
-    #[access(get)]
-    pub email: Option<String>,
     #[access(get(ty = &std::path::Path))]
     pub public_key_file_relative_path: PathBuf,
     #[access(get(ty = &std::path::Path))]

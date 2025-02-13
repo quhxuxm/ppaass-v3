@@ -15,8 +15,10 @@ use crate::user::ForwardProxyUserRepository;
 use std::fs::read_to_string;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
+use ppaass_common::config::UserInfoConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
+use ppaass_common::user::UserInfoRepository;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::runtime::Builder;
@@ -62,18 +64,20 @@ async fn start_server(
     let mut server_state = ServerState::new();
     server_state.add_value(agent_user_repo.clone());
     if let Some(forward_config) = config.forward() {
+        let forward_config = Arc::new(forward_config.clone());
         let forward_proxy_user_repo = Arc::new(ForwardProxyUserRepository::new(
             FileSystemUserInfoRepository::new(forward_config.user_dir())?,
         ));
-        trace!("Success to create forward proxy user crypto repo: {forward_proxy_user_repo:?}");
-        server_state.add_value(forward_proxy_user_repo.clone());
-        if let Some(connection_pool_config) = forward_config.connection_pool() {
-            let proxy_tcp_connection_pool = ProxyTcpConnectionPool::new(
-                Arc::new(connection_pool_config.clone()),
-                forward_proxy_user_repo.clone(),
-                Arc::new(forward_config.clone()),
-            )
-            .await?;
+        let forward_proxy_user_info = forward_proxy_user_repo
+            .get_user(forward_config.username())?
+            .ok_or(CommonError::Other(format!(
+                "Can not get user info for forward proxy: {}",
+                forward_config.username()
+            )))?;
+        server_state.add_value(forward_proxy_user_info.clone());
+        if forward_config.connection_pool().is_some() {
+            let proxy_tcp_connection_pool =
+                ProxyTcpConnectionPool::new(forward_config, forward_proxy_user_info).await?;
             server_state.add_value(Arc::new(proxy_tcp_connection_pool));
         }
     }

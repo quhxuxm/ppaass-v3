@@ -3,12 +3,11 @@ use crate::ProxyConfig;
 use futures_util::StreamExt;
 use ppaass_common::error::CommonError;
 
-use crate::user::ForwardProxyUserRepository;
 use ppaass_common::server::{ServerState, ServerTcpStream};
 use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
 use ppaass_common::{
-    AgentTcpConnection, AgentTcpConnectionTunnelCtlState, ProxyTcpConnectionInfoSelector,
-    TunnelInitFailureReason, TunnelInitRequest, TunnelInitResponse, UdpRelayDataRequest,
+    AgentTcpConnection, AgentTcpConnectionTunnelCtlState, TunnelInitFailureReason,
+    TunnelInitRequest, TunnelInitResponse, UdpRelayDataRequest,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -76,11 +75,9 @@ impl Tunnel {
                 }
                 Some(forward_config) => {
                     debug!("[START FORWARD] Begin to initialize tunnel for agent: {agent_socket_address:?}");
-                    let forward_rsa_crypto_repo=server_state.get_value::<Arc<ForwardProxyUserRepository>>().ok_or(CommonError::Other("Proxy configured as forward but no forward user crypto repository configured.".to_string()))?;
                     let destination_edge = DestinationEdge::start_forward(
                         server_state,
-                        forward_config.select_proxy_tcp_connection_info()?,
-                        forward_rsa_crypto_repo.as_ref(),
+                        forward_config,
                         destination_address,
                     )
                     .await?;

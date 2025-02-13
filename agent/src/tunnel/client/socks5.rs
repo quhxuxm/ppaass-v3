@@ -1,12 +1,11 @@
 use crate::config::AgentConfig;
 
-use ppaass_common::config::ConnectionPoolConfig;
+use ppaass_common::config::{ProxyTcpConnectionConfig, UserInfoConfig};
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
-use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
+use ppaass_common::user::UserInfo;
 use ppaass_common::{
-    ProxyTcpConnection, ProxyTcpConnectionInfoSelector, ProxyTcpConnectionPool, TunnelInitRequest,
-    UnifiedAddress,
+    ProxyTcpConnection, ProxyTcpConnectionPool, TunnelInitRequest, UnifiedAddress,
 };
 use socks5_impl::protocol::handshake::Request as Socks5HandshakeRequest;
 use socks5_impl::protocol::handshake::Response as Socks5HandshakeResponse;
@@ -21,7 +20,8 @@ use tracing::{debug, error, info};
 pub async fn socks5_protocol_proxy(
     mut client_tcp_stream: TfoStream,
     client_socket_addr: SocketAddr,
-    config: Arc<AgentConfig>,
+    config: &AgentConfig,
+    user_info: &UserInfo,
     server_state: Arc<ServerState>,
 ) -> Result<(), CommonError> {
     debug!("Client connect to agent with socks 5 protocol: {client_socket_addr}");
@@ -35,27 +35,17 @@ pub async fn socks5_protocol_proxy(
     let init_request =
         Socks5InitRequest::retrieve_from_async_stream(&mut client_tcp_stream).await?;
     debug!("Receive client socks5 handshake init request: {init_request:?}");
-    let user_repo = server_state
-        .get_value::<Arc<FileSystemUserInfoRepository>>()
-        .ok_or(CommonError::Other(format!(
-            "Fail to get user crypto repository for client: {client_socket_addr}"
-        )))?;
     match init_request.command {
         Socks5InitCommand::Connect => {
             debug!("Receive socks5 CONNECT command: {client_socket_addr}");
-            let proxy_tcp_connection_pool = server_state.get_value::<Arc<
-                ProxyTcpConnectionPool<
-                    ConnectionPoolConfig,
-                    AgentConfig,
-                    FileSystemUserInfoRepository,
-                >,
-            >>();
+            let proxy_tcp_connection_pool =
+                server_state.get_value::<Arc<ProxyTcpConnectionPool<AgentConfig>>>();
             let proxy_tcp_connection = match proxy_tcp_connection_pool {
                 None => {
                     ProxyTcpConnection::create(
-                        config.select_proxy_tcp_connection_info()?,
-                        user_repo.as_ref(),
-                        config.proxy_frame_buffer_size(),
+                        config.username(),
+                        user_info,
+                        config.proxy_frame_size(),
                         config.proxy_connect_timeout(),
                     )
                     .await?

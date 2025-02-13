@@ -1,2 +1,4 @@
 public_key_file_relative_path = "ProxyPublicKey.pem"
 private_key_file_relative_path = "AgentPrivateKey.pem"
+proxy_servers = ["45.77.75.244:80"]
+username = "user1"
