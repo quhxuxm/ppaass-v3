@@ -28,16 +28,10 @@ impl UserInfo {
             .insert(key.to_string(), Arc::new(value));
     }
 
-    pub fn get_additional_info<T: Send + Sync + 'static>(&self, key: &str) -> Option<Arc<T>> {
+    pub fn get_additional_info<T: Send + Sync + 'static>(&self, key: &str) -> Option<&T> {
         match self.additional_info.get(key) {
             None => None,
-            Some(additional_info) => {
-                let val = additional_info.downcast_ref::<Arc<T>>();
-                match val {
-                    None => None,
-                    Some(val) => Some(val.clone()),
-                }
-            }
+            Some(additional_info) => additional_info.downcast_ref::<T>(),
         }
     }
 }

@@ -84,7 +84,7 @@ impl AgentTcpConnection<AgentTcpConnectionNewState> {
         let user_expired_time = user_info
             .get_additional_info::<DateTime<Utc>>(USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME);
         if let Some(user_expired_time) = user_expired_time {
-            if Utc::now() > *user_expired_time.as_ref() {
+            if Utc::now() > *user_expired_time {
                 return Err(CommonError::UserExpired(authentication));
             }
         }
