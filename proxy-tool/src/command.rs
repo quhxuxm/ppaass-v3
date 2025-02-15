@@ -22,6 +22,6 @@ pub enum ToolSubCommand {
         #[arg(short, long)]
         expire_after_days: Option<i64>,
         #[arg(short, long)]
-        proxy_servers: Option<Vec<String>>,
+        proxy_servers: Vec<String>,
     },
 }

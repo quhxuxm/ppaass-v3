@@ -7,7 +7,9 @@ use ppaass_common::crypto::{
     DEFAULT_PROXY_PUBLIC_KEY_PATH,
 };
 use ppaass_common::generate_uuid;
-use ppaass_common::user::repo::fs::{FileSystemUserInfoConfig, FS_USER_INFO_CONFIG_FILE_NAME};
+use ppaass_common::user::repo::fs::{
+    FsAgentUserInfoContent, FsProxyUserInfoContent, FS_USER_INFO_CONFIG_FILE_NAME,
+};
 use std::net::SocketAddr;
 use std::ops::Add;
 use std::path::{Path, PathBuf};
@@ -21,7 +23,7 @@ pub struct GenerateUserHandlerArgument {
     pub temp_dir: Option<PathBuf>,
     pub agent_rsa_dir: Option<PathBuf>,
     pub expire_after_days: Option<i64>,
-    pub proxy_servers: Option<Vec<String>>,
+    pub proxy_servers: Vec<String>,
 }
 pub fn generate_user(config: &ProxyToolConfig, arg: GenerateUserHandlerArgument) -> Result<()> {
     let temp_dir = &arg
@@ -62,14 +64,12 @@ pub fn generate_user(config: &ProxyToolConfig, arg: GenerateUserHandlerArgument)
         None => None,
         Some(days) => Some(Utc::now().add(TimeDelta::days(days))),
     };
-    let proxy_user_info = FileSystemUserInfoConfig {
-        username: arg.username.clone(),
+
+    let proxy_user_info = FsProxyUserInfoContent::new(
         expired_date_time,
-        proxy_servers: None,
-        description: None,
-        public_key_file_relative_path: PathBuf::from(DEFAULT_AGENT_PUBLIC_KEY_PATH),
-        private_key_file_relative_path: PathBuf::from(DEFAULT_PROXY_PRIVATE_KEY_PATH),
-    };
+        PathBuf::from(DEFAULT_AGENT_PUBLIC_KEY_PATH),
+        PathBuf::from(DEFAULT_PROXY_PRIVATE_KEY_PATH),
+    );
     let proxy_user_info_config_file_content = toml::to_string(&proxy_user_info)?;
     let proxy_user_info_config_file_path = proxy_user_dir.join(FS_USER_INFO_CONFIG_FILE_NAME);
     std::fs::write(
@@ -109,23 +109,18 @@ pub fn generate_user(config: &ProxyToolConfig, arg: GenerateUserHandlerArgument)
         &arg.username
     );
 
-    if let Some(proxy_servers) = &arg.proxy_servers {
-        for proxy_server in proxy_servers {
-            if let Err(e) = SocketAddr::from_str(&proxy_server) {
-                eprintln!("Failed to parse proxy server: {proxy_server}");
-                return Err(anyhow!("Fail to parse proxy server address: {e:?}"));
-            }
+    for proxy_server in arg.proxy_servers.iter() {
+        if let Err(e) = SocketAddr::from_str(&proxy_server) {
+            eprintln!("Failed to parse proxy server: {proxy_server}");
+            return Err(anyhow!("Fail to parse proxy server address: {e:?}"));
         }
     }
 
-    let agent_user_info = FileSystemUserInfoConfig {
-        username: arg.username,
-        expired_date_time: None,
-        description: None,
-        proxy_servers: arg.proxy_servers,
-        public_key_file_relative_path: PathBuf::from(DEFAULT_PROXY_PUBLIC_KEY_PATH),
-        private_key_file_relative_path: PathBuf::from(DEFAULT_AGENT_PRIVATE_KEY_PATH),
-    };
+    let agent_user_info = FsAgentUserInfoContent::new(
+        arg.proxy_servers,
+        PathBuf::from(DEFAULT_PROXY_PUBLIC_KEY_PATH),
+        PathBuf::from(DEFAULT_AGENT_PRIVATE_KEY_PATH),
+    );
     let agent_user_info_config_file_content = toml::to_string(&agent_user_info)?;
     let agent_user_info_config_file_path = agent_user_dir.join(FS_USER_INFO_CONFIG_FILE_NAME);
     std::fs::write(

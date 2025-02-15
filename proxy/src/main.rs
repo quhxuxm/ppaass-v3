@@ -17,7 +17,10 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use ppaass_common::config::UserInfoConfig;
 use ppaass_common::error::CommonError;
-use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
+use ppaass_common::user::repo::fs::{
+    FileSystemUserInfoRepository, FsAgentUserInfoContent, FsProxyUserInfoContent,
+    USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME, USER_INFO_ADDITION_INFO_PROXY_SERVERS,
+};
 use ppaass_common::user::UserInfoRepository;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -66,7 +69,15 @@ async fn start_server(
     if let Some(forward_config) = config.forward() {
         let forward_config = Arc::new(forward_config.clone());
         let forward_proxy_user_repo = Arc::new(ForwardProxyUserRepository::new(
-            FileSystemUserInfoRepository::new(forward_config.user_dir())?,
+            FileSystemUserInfoRepository::new::<FsAgentUserInfoContent, _>(
+                forward_config.user_dir(),
+                |user_info, content| {
+                    user_info.add_additional_info(
+                        USER_INFO_ADDITION_INFO_PROXY_SERVERS,
+                        content.proxy_servers().to_owned(),
+                    );
+                },
+            )?,
         ));
         let forward_proxy_user_info = forward_proxy_user_repo
             .get_user(forward_config.username())?
@@ -101,7 +112,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .agent_rsa_dir
         .unwrap_or(config.user_dir().to_owned());
     debug!("Rsa directory of the proxy server: {user_dir:?}");
-    let rsa_crypto_repo = Arc::new(FileSystemUserInfoRepository::new(&user_dir)?);
+    let rsa_crypto_repo = Arc::new(FileSystemUserInfoRepository::new::<
+        FsProxyUserInfoContent,
+        _,
+    >(&user_dir, |user_info, content| {
+        if let Some(expired_date_time) = content.expired_date_time() {
+            user_info.add_additional_info(
+                USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME,
+                expired_date_time.to_owned(),
+            );
+        }
+    })?);
     trace!("Success to create agent_user crypto repo: {rsa_crypto_repo:?}");
     let runtime = Builder::new_multi_thread()
         .enable_all()

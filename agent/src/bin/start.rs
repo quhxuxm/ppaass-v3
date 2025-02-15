@@ -4,7 +4,9 @@ use ppaass_agent::AgentConfig;
 use ppaass_agent::Command;
 use ppaass_common::config::ServerConfig;
 use ppaass_common::init_logger;
-use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
+use ppaass_common::user::repo::fs::{
+    FileSystemUserInfoRepository, FsAgentUserInfoContent, USER_INFO_ADDITION_INFO_PROXY_SERVERS,
+};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -24,7 +26,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Arc::new(toml::from_str::<AgentConfig>(&config_file_content)?);
     let log_dir = command.log_dir.unwrap_or(config.log_dir().clone());
     let _log_guard = init_logger(&log_dir, config.log_name_prefix(), config.max_log_level())?;
-    let user_repo = Arc::new(FileSystemUserInfoRepository::new(config.user_dir())?);
+    let user_repo = Arc::new(FileSystemUserInfoRepository::new::<
+        FsAgentUserInfoContent,
+        _,
+    >(config.user_dir(), |user_info, content| {
+        user_info.add_additional_info(
+            USER_INFO_ADDITION_INFO_PROXY_SERVERS,
+            content.proxy_servers().to_owned(),
+        );
+    })?);
     let runtime = Builder::new_multi_thread()
         .enable_all()
         .worker_threads(config.worker_thread_number())
