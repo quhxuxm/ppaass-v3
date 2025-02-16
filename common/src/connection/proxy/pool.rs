@@ -9,7 +9,7 @@ use crate::config::{ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::channel;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::sleep;
 use tracing::{debug, error};
 #[derive(Debug)]
@@ -58,7 +58,7 @@ where
     /// The pool to store the proxy connection
     pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
     config: Arc<C>,
-    user_info: Arc<UserInfo>,
+    user_info: Arc<RwLock<UserInfo>>,
     username: String,
 }
 impl<C> ProxyTcpConnectionPool<C>
@@ -69,7 +69,7 @@ where
     pub async fn new(
         config: Arc<C>,
         username: &str,
-        user_info: Arc<UserInfo>,
+        user_info: Arc<RwLock<UserInfo>>,
     ) -> Result<Self, CommonError> {
         let pool = Arc::new(Mutex::new(Vec::new()));
         let interval = config.fill_interval();
@@ -200,7 +200,7 @@ where
     async fn concrete_take_proxy_connection(
         pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
         config: Arc<C>,
-        user_info: Arc<UserInfo>,
+        user_info: Arc<RwLock<UserInfo>>,
         username: &str,
     ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
         let mut pool_lock = pool.lock().await;
@@ -231,7 +231,7 @@ where
     async fn fill_pool(
         pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
         config: Arc<C>,
-        user_info: Arc<UserInfo>,
+        user_info: Arc<RwLock<UserInfo>>,
         username: &str,
     ) {
         let max_pool_size = config.max_pool_size();
@@ -254,9 +254,10 @@ where
             let config = config.clone();
             let username = username.to_owned();
             tokio::spawn(async move {
+                let user_info = user_info.read().await;
                 match ProxyTcpConnection::create(
                     &username,
-                    user_info.as_ref(),
+                    &user_info,
                     config.proxy_frame_size(),
                     config.proxy_connect_timeout(),
                 )

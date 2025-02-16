@@ -32,6 +32,8 @@ pub struct ProxyConfig {
     destination_to_proxy_data_relay_buffer_size: usize,
     #[access(get)]
     forward: Option<ForwardConfig>,
+    #[access(get(cp))]
+    user_info_repository_refresh_interval: u64,
 }
 
 impl ServerConfig for ProxyConfig {

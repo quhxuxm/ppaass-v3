@@ -7,6 +7,7 @@ use ppaass_common::server::{ServerState, ServerTcpStream};
 use ppaass_common::user::UserInfo;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio_tfo::TfoStream;
 use tracing::{debug, error};
 const SOCKS5_VERSION: u8 = 0x05;
@@ -32,7 +33,7 @@ pub async fn handle_client_connection(
         return Err(CommonError::ConnectionExhausted(client_socket_addr));
     }
     let (username, user_info) = server_state
-        .get_value::<(String, Arc<UserInfo>)>()
+        .get_value::<(String, Arc<RwLock<UserInfo>>)>()
         .ok_or(CommonError::Other("Can not get user info".to_owned()))?
         .clone();
     match protocol[0] {
@@ -43,7 +44,7 @@ pub async fn handle_client_connection(
                 client_socket_addr,
                 &config,
                 &username,
-                &user_info,
+                user_info,
                 server_state,
             )
             .await
@@ -54,7 +55,7 @@ pub async fn handle_client_connection(
                 TfoStream::from(client_tcp_stream),
                 client_socket_addr,
                 &config,
-                &user_info,
+                user_info,
                 server_state,
             )
             .await
@@ -66,7 +67,7 @@ pub async fn handle_client_connection(
                 client_socket_addr,
                 &config,
                 &username,
-                &user_info,
+                user_info,
                 server_state,
             )
             .await

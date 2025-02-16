@@ -4,7 +4,7 @@ use crate::error::CommonError;
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
-
+use tokio::sync::RwLock;
 #[derive(Debug)]
 pub struct UserInfo {
     rsa_crypto: RsaCrypto,
@@ -36,7 +36,9 @@ impl UserInfo {
     }
 }
 
+#[async_trait::async_trait]
 pub trait UserInfoRepository {
-    fn get_user(&self, username: &str) -> Result<Option<Arc<UserInfo>>, CommonError>;
-    fn get_single_user(&self) -> Result<Option<(String, Arc<UserInfo>)>, CommonError>;
+    async fn get_user(&self, username: &str) -> Result<Option<Arc<RwLock<UserInfo>>>, CommonError>;
+    async fn get_single_user(&self)
+        -> Result<Option<(String, Arc<RwLock<UserInfo>>)>, CommonError>;
 }

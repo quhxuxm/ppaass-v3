@@ -67,19 +67,26 @@ async fn start_server(
     server_state.add_value(agent_user_repo.clone());
     if let Some(forward_config) = config.forward() {
         let forward_config = Arc::new(forward_config.clone());
-        let forward_proxy_user_repo = Arc::new(ForwardProxyUserRepository::new(
-            FileSystemUserInfoRepository::new::<FsAgentUserInfoContent, _>(
+        let forward_fs_user_repo =
+            ForwardProxyUserRepository::new(FileSystemUserInfoRepository::new::<
+                FsAgentUserInfoContent,
+                _,
+                _,
+            >(
+                config.user_info_repository_refresh_interval(),
                 forward_config.user_dir(),
-                |user_info, content| {
+                |user_info, content| async move {
+                    let mut user_info = user_info.write().await;
                     user_info.add_additional_info(
                         USER_INFO_ADDITION_INFO_PROXY_SERVERS,
                         content.proxy_servers().to_owned(),
                     );
                 },
-            )?,
-        ));
+            )?);
+        let forward_proxy_user_repo = Arc::new(forward_fs_user_repo);
         let (forward_username, forward_proxy_user_info) = forward_proxy_user_repo
-            .get_single_user()?
+            .get_single_user()
+            .await?
             .ok_or(CommonError::Other(
                 "Can not get user info for forward proxy".to_owned(),
             ))?;
@@ -110,29 +117,39 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = Arc::new(toml::from_str::<ProxyConfig>(&config_file_content)?);
     let log_dir = command.log_dir.unwrap_or(config.log_dir().clone());
     let _log_guard = init_logger(&log_dir, config.log_name_prefix(), config.max_log_level())?;
-    let user_dir = command
-        .agent_rsa_dir
-        .unwrap_or(config.user_dir().to_owned());
-    debug!("Rsa directory of the proxy server: {user_dir:?}");
-    let rsa_crypto_repo = Arc::new(FileSystemUserInfoRepository::new::<
-        FsProxyUserInfoContent,
-        _,
-    >(&user_dir, |user_info, content| {
-        if let Some(expired_date_time) = content.expired_date_time() {
-            user_info.add_additional_info(
-                USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME,
-                expired_date_time.to_owned(),
-            );
-        }
-    })?);
-    trace!("Success to create agent_user crypto repo: {rsa_crypto_repo:?}");
+
     let runtime = Builder::new_multi_thread()
         .enable_all()
         .worker_threads(config.worker_thread_number())
         .build()?;
     runtime.block_on(async move {
-        if let Err(e) = start_server(config, rsa_crypto_repo).await {
-            error!("Fail to start proxy server: {e:?}")
+        let user_dir = command
+            .agent_rsa_dir
+            .unwrap_or(config.user_dir().to_owned());
+        debug!("Rsa directory of the proxy server: {user_dir:?}");
+        let fs_user_repo = match FileSystemUserInfoRepository::new::<FsProxyUserInfoContent, _, _>(
+            config.user_info_repository_refresh_interval(),
+            &user_dir,
+            |user_info, content| async move {
+                if let Some(expired_date_time) = content.expired_date_time() {
+                    let mut user_info = user_info.write().await;
+                    user_info.add_additional_info(
+                        USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME,
+                        expired_date_time.to_owned(),
+                    );
+                }
+            },
+        ) {
+            Ok(fs_user_repo) => fs_user_repo,
+            Err(e) => {
+                error!("Fail to start proxy server when create user info repository: {e:?}");
+                return;
+            }
+        };
+        let rsa_crypto_repo = Arc::new(fs_user_repo);
+        trace!("Success to create agent_user crypto repo: {rsa_crypto_repo:?}");
+        if let Err(e) = start_server(config.clone(), rsa_crypto_repo.clone()).await {
+            error!("Fail to start proxy server: {e:?}");
         }
     });
     Ok(())

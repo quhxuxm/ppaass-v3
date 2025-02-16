@@ -15,6 +15,7 @@ use socks5_impl::protocol::{
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio_tfo::TfoStream;
 use tracing::{debug, error, info};
 pub async fn socks5_protocol_proxy(
@@ -22,7 +23,7 @@ pub async fn socks5_protocol_proxy(
     client_socket_addr: SocketAddr,
     config: &AgentConfig,
     username: &str,
-    user_info: &UserInfo,
+    user_info: Arc<RwLock<UserInfo>>,
     server_state: Arc<ServerState>,
 ) -> Result<(), CommonError> {
     debug!("Client connect to agent with socks 5 protocol: {client_socket_addr}");
@@ -43,9 +44,10 @@ pub async fn socks5_protocol_proxy(
                 server_state.get_value::<Arc<ProxyTcpConnectionPool<AgentConfig>>>();
             let proxy_tcp_connection = match proxy_tcp_connection_pool {
                 None => {
+                    let user_info = user_info.read().await;
                     ProxyTcpConnection::create(
                         username,
-                        user_info,
+                        &user_info,
                         config.proxy_frame_size(),
                         config.proxy_connect_timeout(),
                     )

@@ -2,6 +2,7 @@ use ppaass_common::error::CommonError;
 use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
 use ppaass_common::user::{UserInfo, UserInfoRepository};
 use std::sync::Arc;
+use tokio::sync::RwLock;
 #[derive(Debug)]
 pub struct ForwardProxyUserRepository {
     concrete_user_repo: FileSystemUserInfoRepository,
@@ -11,11 +12,15 @@ impl ForwardProxyUserRepository {
         Self { concrete_user_repo }
     }
 }
+
+#[async_trait::async_trait]
 impl UserInfoRepository for ForwardProxyUserRepository {
-    fn get_user(&self, username: &str) -> Result<Option<Arc<UserInfo>>, CommonError> {
-        self.concrete_user_repo.get_user(username)
+    async fn get_user(&self, username: &str) -> Result<Option<Arc<RwLock<UserInfo>>>, CommonError> {
+        self.concrete_user_repo.get_user(username).await
     }
-    fn get_single_user(&self) -> Result<Option<(String, Arc<UserInfo>)>, CommonError> {
-        self.concrete_user_repo.get_single_user()
+    async fn get_single_user(
+        &self,
+    ) -> Result<Option<(String, Arc<RwLock<UserInfo>>)>, CommonError> {
+        self.concrete_user_repo.get_single_user().await
     }
 }

@@ -18,6 +18,7 @@ use ppaass_common::config::ProxyTcpConnectionConfig;
 use ppaass_common::user::UserInfo;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio_tfo::TfoStream;
 use tower::ServiceBuilder;
 use tracing::{debug, error, info};
@@ -150,17 +151,18 @@ pub async fn http_protocol_proxy(
     client_socket_addr: SocketAddr,
     config: &AgentConfig,
     username: &str,
-    user_info: &UserInfo,
+    user_info: Arc<RwLock<UserInfo>>,
     server_state: Arc<ServerState>,
 ) -> Result<(), CommonError> {
     let client_tcp_io = TokioIo::new(client_tcp_stream);
     let service_fn = ServiceBuilder::new().service(service_fn(|request| {
         let server_state = server_state.clone();
         async {
+            let user_info = user_info.read().await;
             client_http_request_handler(
                 config,
                 username,
-                user_info,
+                &user_info,
                 server_state,
                 client_socket_addr,
                 request,

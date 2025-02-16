@@ -13,8 +13,10 @@ use ppaass_common::user::UserInfoRepository;
 use ppaass_common::ProxyTcpConnectionPool;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::net::TcpListener;
-use tracing::debug;
+use tokio::time::sleep;
+use tracing::{debug, info};
 pub use tunnel::handle_client_connection;
 
 async fn create_server_listener(config: Arc<AgentConfig>) -> Result<ServerListener, CommonError> {
@@ -47,12 +49,19 @@ async fn create_server_listener(config: Arc<AgentConfig>) -> Result<ServerListen
 
 pub async fn start_server(
     config: Arc<AgentConfig>,
-    user_repo: &FileSystemUserInfoRepository,
+    user_repo: Arc<FileSystemUserInfoRepository>,
 ) -> Result<(), CommonError> {
     let mut server_state = ServerState::new();
-    let (username, user_info) = user_repo
-        .get_single_user()?
-        .ok_or(CommonError::Other("User not found".to_owned()))?;
+    let (username, user_info) = loop {
+        match user_repo.get_single_user().await? {
+            None => {
+                sleep(Duration::from_secs(5)).await;
+                continue;
+            }
+            Some(element) => break element,
+        }
+    };
+    info!("Start agent server with username: {}", &username);
     server_state.add_value((username.clone(), user_info.clone()));
     if config.connection_pool().is_some() {
         let proxy_tcp_connection_pool =

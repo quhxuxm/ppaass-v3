@@ -79,8 +79,10 @@ impl AgentTcpConnection<AgentTcpConnectionNewState> {
             .await
             .ok_or(CommonError::ConnectionExhausted(agent_socket_address))??;
         let user_info = user_info_repo
-            .get_user(&authentication)?
+            .get_user(&authentication)
+            .await?
             .ok_or(CommonError::RsaCryptoNotFound(authentication.clone()))?;
+        let user_info = user_info.read().await;
         let user_expired_time = user_info
             .get_additional_info::<DateTime<Utc>>(USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME);
         if let Some(user_expired_time) = user_expired_time {

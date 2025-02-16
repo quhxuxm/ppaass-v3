@@ -26,6 +26,8 @@ pub struct AgentConfig {
     proxy_to_agent_data_relay_buffer_size: usize,
     proxy_frame_buffer_size: usize,
     proxy_connect_timeout: u64,
+    #[access(get(cp))]
+    user_info_repository_refresh_interval: u64,
     #[access(get)]
     connection_pool: Option<DefaultConnectionPoolConfig>,
 }

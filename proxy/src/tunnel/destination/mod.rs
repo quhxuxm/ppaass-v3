@@ -11,6 +11,7 @@ use ppaass_common::{
 };
 use std::sync::Arc;
 pub use tcp::*;
+use tokio::sync::RwLock;
 use tracing::debug;
 pub use udp::*;
 pub enum DestinationEdge {
@@ -37,14 +38,15 @@ impl DestinationEdge {
         destination_address: UnifiedAddress,
     ) -> Result<Self, CommonError> {
         let (username, user_info) = server_state
-            .get_value::<(String, Arc<UserInfo>)>()
+            .get_value::<(String, Arc<RwLock<UserInfo>>)>()
             .ok_or(CommonError::Other("Can not find forward user".to_owned()))?;
         let proxy_tcp_connection_pool =
             match server_state.get_value::<Arc<ProxyTcpConnectionPool<ForwardConfig>>>() {
                 None => {
+                    let user_info = user_info.read().await;
                     ProxyTcpConnection::create(
                         &username,
-                        user_info,
+                        &user_info,
                         forward_config.proxy_frame_size(),
                         forward_config.proxy_connect_timeout(),
                     )

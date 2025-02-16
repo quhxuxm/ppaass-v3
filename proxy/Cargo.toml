@@ -18,3 +18,4 @@ toml = { workspace = true }
 rand = { workspace = true }
 tokio-tfo = { workspace = true }
 mimalloc = { workspace = true }
+async-trait = { workspace = true }
