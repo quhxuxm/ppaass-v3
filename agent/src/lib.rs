@@ -5,7 +5,7 @@ mod tunnel;
 
 pub use command::Command;
 pub use config::AgentConfig;
-use ppaass_common::config::{ServerConfig, UserInfoConfig};
+use ppaass_common::config::ServerConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::{CommonServer, Server, ServerListener, ServerState};
 use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
@@ -50,13 +50,13 @@ pub async fn start_server(
     user_repo: &FileSystemUserInfoRepository,
 ) -> Result<(), CommonError> {
     let mut server_state = ServerState::new();
-    let user_info = user_repo
-        .get_user(config.username())?
+    let (username, user_info) = user_repo
+        .get_single_user()?
         .ok_or(CommonError::Other("User not found".to_owned()))?;
-    server_state.add_value(user_info.clone());
+    server_state.add_value((username.clone(), user_info.clone()));
     if config.connection_pool().is_some() {
         let proxy_tcp_connection_pool =
-            ProxyTcpConnectionPool::new(config.clone(), user_info.clone()).await?;
+            ProxyTcpConnectionPool::new(config.clone(), &username, user_info.clone()).await?;
         server_state.add_value(Arc::new(proxy_tcp_connection_pool));
     }
     let server = CommonServer::new(config.clone(), server_state);

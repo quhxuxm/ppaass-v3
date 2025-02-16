@@ -1,9 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-pub trait UserInfoConfig {
-    fn username(&self) -> &str;
-}
-
 pub trait ProxyTcpConnectionPoolConfig {
     fn max_pool_size(&self) -> usize;
     fn fill_interval(&self) -> u64;

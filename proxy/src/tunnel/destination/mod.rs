@@ -1,7 +1,7 @@
 mod tcp;
 mod udp;
 use crate::ForwardConfig;
-use ppaass_common::config::{ProxyTcpConnectionConfig, UserInfoConfig};
+use ppaass_common::config::ProxyTcpConnectionConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
 use ppaass_common::user::UserInfo;
@@ -36,17 +36,14 @@ impl DestinationEdge {
         forward_config: &ForwardConfig,
         destination_address: UnifiedAddress,
     ) -> Result<Self, CommonError> {
-        let user_info = server_state
-            .get_value::<Arc<UserInfo>>()
-            .ok_or(CommonError::Other(format!(
-                "Can not find forward user info: {}",
-                forward_config.username()
-            )))?;
+        let (username, user_info) = server_state
+            .get_value::<(String, Arc<UserInfo>)>()
+            .ok_or(CommonError::Other("Can not find forward user".to_owned()))?;
         let proxy_tcp_connection_pool =
             match server_state.get_value::<Arc<ProxyTcpConnectionPool<ForwardConfig>>>() {
                 None => {
                     ProxyTcpConnection::create(
-                        forward_config.username(),
+                        &username,
                         user_info,
                         forward_config.proxy_frame_size(),
                         forward_config.proxy_connect_timeout(),

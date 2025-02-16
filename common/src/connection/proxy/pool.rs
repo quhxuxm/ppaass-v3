@@ -5,7 +5,7 @@ use chrono::{DateTime, Utc};
 use std::cmp::Ordering;
 use std::fmt::Debug;
 
-use crate::config::{ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig, UserInfoConfig};
+use crate::config::{ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::channel;
@@ -15,13 +15,7 @@ use tracing::{debug, error};
 #[derive(Debug)]
 struct ProxyTcpConnectionPoolElement<C>
 where
-    C: ProxyTcpConnectionPoolConfig
-        + ProxyTcpConnectionConfig
-        + UserInfoConfig
-        + Debug
-        + Send
-        + Sync
-        + 'static,
+    C: ProxyTcpConnectionPoolConfig + ProxyTcpConnectionConfig + Debug + Send + Sync + 'static,
 {
     proxy_tcp_connection: ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>,
     create_time: DateTime<Utc>,
@@ -31,13 +25,7 @@ where
 }
 impl<C> ProxyTcpConnectionPoolElement<C>
 where
-    C: ProxyTcpConnectionPoolConfig
-        + ProxyTcpConnectionConfig
-        + UserInfoConfig
-        + Debug
-        + Send
-        + Sync
-        + 'static,
+    C: ProxyTcpConnectionPoolConfig + ProxyTcpConnectionConfig + Debug + Send + Sync + 'static,
 {
     pub fn new(
         proxy_tcp_connection: ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>,
@@ -65,36 +53,30 @@ where
 /// The connection pool for proxy connection.
 pub struct ProxyTcpConnectionPool<C>
 where
-    C: ProxyTcpConnectionPoolConfig
-        + ProxyTcpConnectionConfig
-        + UserInfoConfig
-        + Debug
-        + Send
-        + Sync
-        + 'static,
+    C: ProxyTcpConnectionPoolConfig + ProxyTcpConnectionConfig + Debug + Send + Sync + 'static,
 {
     /// The pool to store the proxy connection
     pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
     config: Arc<C>,
     user_info: Arc<UserInfo>,
+    username: String,
 }
 impl<C> ProxyTcpConnectionPool<C>
 where
-    C: ProxyTcpConnectionPoolConfig
-        + ProxyTcpConnectionConfig
-        + UserInfoConfig
-        + Debug
-        + Send
-        + Sync
-        + 'static,
+    C: ProxyTcpConnectionPoolConfig + ProxyTcpConnectionConfig + Debug + Send + Sync + 'static,
 {
     /// Create the proxy connection pool
-    pub async fn new(config: Arc<C>, user_info: Arc<UserInfo>) -> Result<Self, CommonError> {
+    pub async fn new(
+        config: Arc<C>,
+        username: &str,
+        user_info: Arc<UserInfo>,
+    ) -> Result<Self, CommonError> {
         let pool = Arc::new(Mutex::new(Vec::new()));
         let interval = config.fill_interval();
         let pool_clone = pool.clone();
         let user_info_clone = user_info.clone();
         let config_clone = config.clone();
+        let username_clone = username.to_owned();
         tokio::spawn(async move {
             loop {
                 debug!("Starting connection pool auto filling loop.");
@@ -102,6 +84,7 @@ where
                     pool_clone.clone(),
                     config_clone.clone(),
                     user_info_clone.clone(),
+                    &username_clone,
                 )
                 .await;
                 sleep(Duration::from_secs(interval)).await;
@@ -112,6 +95,7 @@ where
             pool,
             config,
             user_info,
+            username: username.to_owned(),
         })
     }
     pub async fn take_proxy_connection(
@@ -121,6 +105,7 @@ where
             self.pool.clone(),
             self.config.clone(),
             self.user_info.clone(),
+            &self.username,
         )
         .await
     }
@@ -216,6 +201,7 @@ where
         pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
         config: Arc<C>,
         user_info: Arc<UserInfo>,
+        username: &str,
     ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
         let mut pool_lock = pool.lock().await;
         debug!(
@@ -226,9 +212,9 @@ where
         match proxy_tcp_connection_element {
             None => {
                 drop(pool_lock);
-                Self::fill_pool(pool.clone(), config.clone(), user_info.clone()).await;
+                Self::fill_pool(pool.clone(), config.clone(), user_info.clone(), username).await;
                 Box::pin(Self::concrete_take_proxy_connection(
-                    pool, config, user_info,
+                    pool, config, user_info, username,
                 ))
                 .await
             }
@@ -246,6 +232,7 @@ where
         pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
         config: Arc<C>,
         user_info: Arc<UserInfo>,
+        username: &str,
     ) {
         let max_pool_size = config.max_pool_size();
         let mut pool_lock = pool.lock().await;
@@ -265,9 +252,10 @@ where
 
             let user_info = user_info.clone();
             let config = config.clone();
+            let username = username.to_owned();
             tokio::spawn(async move {
                 match ProxyTcpConnection::create(
-                    config.username(),
+                    &username,
                     user_info.as_ref(),
                     config.proxy_frame_size(),
                     config.proxy_connect_timeout(),

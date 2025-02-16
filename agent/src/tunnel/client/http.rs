@@ -14,7 +14,7 @@ use ppaass_common::{
 
 use ppaass_common::server::ServerState;
 
-use ppaass_common::config::{ProxyTcpConnectionConfig, UserInfoConfig};
+use ppaass_common::config::ProxyTcpConnectionConfig;
 use ppaass_common::user::UserInfo;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -29,6 +29,7 @@ fn success_empty_body() -> BoxBody<Bytes, hyper::Error> {
 
 async fn client_http_request_handler(
     config: &AgentConfig,
+    username: &str,
     user_info: &UserInfo,
     server_state: Arc<ServerState>,
     client_socket_addr: SocketAddr,
@@ -56,7 +57,7 @@ async fn client_http_request_handler(
     let proxy_tcp_connection = match proxy_tcp_connection_pool {
         None => {
             ProxyTcpConnection::create(
-                config.username(),
+                username,
                 user_info,
                 config.proxy_frame_size(),
                 config.proxy_connect_timeout(),
@@ -148,6 +149,7 @@ pub async fn http_protocol_proxy(
     client_tcp_stream: TfoStream,
     client_socket_addr: SocketAddr,
     config: &AgentConfig,
+    username: &str,
     user_info: &UserInfo,
     server_state: Arc<ServerState>,
 ) -> Result<(), CommonError> {
@@ -157,6 +159,7 @@ pub async fn http_protocol_proxy(
         async {
             client_http_request_handler(
                 config,
+                username,
                 user_info,
                 server_state,
                 client_socket_addr,

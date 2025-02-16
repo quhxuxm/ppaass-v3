@@ -31,8 +31,8 @@ pub async fn handle_client_connection(
         error!("Client tcp stream exhausted: {client_socket_addr}");
         return Err(CommonError::ConnectionExhausted(client_socket_addr));
     }
-    let user_info = server_state
-        .get_value::<Arc<UserInfo>>()
+    let (username, user_info) = server_state
+        .get_value::<(String, Arc<UserInfo>)>()
         .ok_or(CommonError::Other("Can not get user info".to_owned()))?
         .clone();
     match protocol[0] {
@@ -42,6 +42,7 @@ pub async fn handle_client_connection(
                 TfoStream::from(client_tcp_stream),
                 client_socket_addr,
                 &config,
+                &username,
                 &user_info,
                 server_state,
             )
@@ -64,6 +65,7 @@ pub async fn handle_client_connection(
                 TfoStream::from(client_tcp_stream),
                 client_socket_addr,
                 &config,
+                &username,
                 &user_info,
                 server_state,
             )

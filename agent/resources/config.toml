@@ -1,6 +1,5 @@
 ip_v6 = false
 server_port = 10080
-username = "user1"
 worker_thread_number = 64
 log_dir = "log"
 log_name_prefix = "ppaass-agent-v3"

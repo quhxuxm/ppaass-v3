@@ -162,4 +162,19 @@ impl UserInfoRepository for FileSystemUserInfoRepository {
             Some(user_info) => Ok(Some(user_info.clone())),
         }
     }
+
+    fn get_single_user(&self) -> Result<Option<(String, Arc<UserInfo>)>, CommonError> {
+        let keys = self.user_info_storage.keys().collect::<Vec<&String>>();
+        let first_key = keys.first().ok_or(CommonError::Other(format!(
+            "No users in the system: {:?}",
+            keys
+        )))?;
+        let user = self
+            .user_info_storage
+            .get(*first_key)
+            .ok_or(CommonError::Other(format!(
+                "Can not find user by key: {first_key:?  }"
+            )))?;
+        Ok(Some((first_key.to_string(), user.clone())))
+    }
 }

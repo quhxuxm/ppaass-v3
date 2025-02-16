@@ -38,4 +38,5 @@ impl UserInfo {
 
 pub trait UserInfoRepository {
     fn get_user(&self, username: &str) -> Result<Option<Arc<UserInfo>>, CommonError>;
+    fn get_single_user(&self) -> Result<Option<(String, Arc<UserInfo>)>, CommonError>;
 }

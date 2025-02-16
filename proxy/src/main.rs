@@ -15,7 +15,6 @@ use crate::user::ForwardProxyUserRepository;
 use std::fs::read_to_string;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
-use ppaass_common::config::UserInfoConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::user::repo::fs::{
     FileSystemUserInfoRepository, FsAgentUserInfoContent, FsProxyUserInfoContent,
@@ -79,16 +78,19 @@ async fn start_server(
                 },
             )?,
         ));
-        let forward_proxy_user_info = forward_proxy_user_repo
-            .get_user(forward_config.username())?
-            .ok_or(CommonError::Other(format!(
-                "Can not get user info for forward proxy: {}",
-                forward_config.username()
-            )))?;
-        server_state.add_value(forward_proxy_user_info.clone());
+        let (forward_username, forward_proxy_user_info) = forward_proxy_user_repo
+            .get_single_user()?
+            .ok_or(CommonError::Other(
+                "Can not get user info for forward proxy".to_owned(),
+            ))?;
+        server_state.add_value((forward_username.clone(), forward_proxy_user_info.clone()));
         if forward_config.connection_pool().is_some() {
-            let proxy_tcp_connection_pool =
-                ProxyTcpConnectionPool::new(forward_config, forward_proxy_user_info).await?;
+            let proxy_tcp_connection_pool = ProxyTcpConnectionPool::new(
+                forward_config,
+                &forward_username,
+                forward_proxy_user_info,
+            )
+            .await?;
             server_state.add_value(Arc::new(proxy_tcp_connection_pool));
         }
     }

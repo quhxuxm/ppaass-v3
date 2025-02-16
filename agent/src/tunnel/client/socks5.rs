@@ -1,6 +1,6 @@
 use crate::config::AgentConfig;
 
-use ppaass_common::config::{ProxyTcpConnectionConfig, UserInfoConfig};
+use ppaass_common::config::ProxyTcpConnectionConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
 use ppaass_common::user::UserInfo;
@@ -21,6 +21,7 @@ pub async fn socks5_protocol_proxy(
     mut client_tcp_stream: TfoStream,
     client_socket_addr: SocketAddr,
     config: &AgentConfig,
+    username: &str,
     user_info: &UserInfo,
     server_state: Arc<ServerState>,
 ) -> Result<(), CommonError> {
@@ -43,7 +44,7 @@ pub async fn socks5_protocol_proxy(
             let proxy_tcp_connection = match proxy_tcp_connection_pool {
                 None => {
                     ProxyTcpConnection::create(
-                        config.username(),
+                        username,
                         user_info,
                         config.proxy_frame_size(),
                         config.proxy_connect_timeout(),

@@ -1,7 +1,7 @@
 use accessory::Accessors;
 use ppaass_common::config::{
     DefaultConnectionPoolConfig, ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig,
-    ServerConfig, UserInfoConfig,
+    ServerConfig,
 };
 
 use serde::{Deserialize, Serialize};
@@ -20,7 +20,6 @@ pub struct AgentConfig {
     max_log_level: String,
     #[access(get(ty=&std::path::Path))]
     user_dir: PathBuf,
-    username: String,
     #[access(get(cp))]
     agent_to_proxy_data_relay_buffer_size: usize,
     #[access(get(cp))]
@@ -29,11 +28,6 @@ pub struct AgentConfig {
     proxy_connect_timeout: u64,
     #[access(get)]
     connection_pool: Option<DefaultConnectionPoolConfig>,
-}
-impl UserInfoConfig for AgentConfig {
-    fn username(&self) -> &str {
-        self.username.as_str()
-    }
 }
 
 impl ProxyTcpConnectionConfig for AgentConfig {

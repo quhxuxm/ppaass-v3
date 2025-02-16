@@ -1,7 +1,7 @@
 use accessory::Accessors;
 use ppaass_common::config::{
     DefaultConnectionPoolConfig, ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig,
-    ServerConfig, UserInfoConfig,
+    ServerConfig,
 };
 
 use serde::{Deserialize, Serialize};
@@ -51,15 +51,9 @@ pub struct ForwardConfig {
     proxy_connect_timeout: u64,
     #[access(get(ty=&std::path::Path))]
     user_dir: PathBuf,
-    username: String,
     proxy_frame_buffer_size: usize,
     #[access(get)]
     connection_pool: Option<DefaultConnectionPoolConfig>,
-}
-impl UserInfoConfig for ForwardConfig {
-    fn username(&self) -> &str {
-        &self.username
-    }
 }
 
 impl ProxyTcpConnectionConfig for ForwardConfig {
