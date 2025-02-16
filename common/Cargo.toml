@@ -29,3 +29,4 @@ bytes = { workspace = true }
 cbc = { workspace = true }
 toml = { workspace = true }
 accessory = { workspace = true }
+zip = { workspace = true }
