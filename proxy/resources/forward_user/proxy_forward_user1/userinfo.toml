@@ -1,3 +1,0 @@
-public_key_file_relative_path = "ProxyPublicKey.pem"
-private_key_file_relative_path = "AgentPrivateKey.pem"
-proxy_servers = ["127.0.0.1:91"]
