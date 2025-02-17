@@ -23,7 +23,9 @@ use ppaass_common::user::repo::fs::{
 use ppaass_common::user::UserInfoRepository;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::runtime::Builder;
+use tokio::time::sleep;
 use tokio_tfo::TfoListener;
 use tracing::{debug, error, trace};
 #[global_allocator]
@@ -84,12 +86,15 @@ async fn start_server(
                 },
             )?);
         let forward_proxy_user_repo = Arc::new(forward_fs_user_repo);
-        let (forward_username, forward_proxy_user_info) = forward_proxy_user_repo
-            .get_single_user()
-            .await?
-            .ok_or(CommonError::Other(
-                "Can not get user info for forward proxy".to_owned(),
-            ))?;
+        let (forward_username, forward_proxy_user_info) = loop {
+            match forward_proxy_user_repo.get_single_user().await? {
+                None => {
+                    sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+                Some(element) => break element,
+            }
+        };
         server_state.add_value((forward_username.clone(), forward_proxy_user_info.clone()));
         if forward_config.connection_pool().is_some() {
             let proxy_tcp_connection_pool = ProxyTcpConnectionPool::new(
