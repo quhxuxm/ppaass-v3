@@ -52,13 +52,24 @@ pub async fn start_server(
     user_repo: Arc<FileSystemUserInfoRepository>,
 ) -> Result<(), CommonError> {
     let mut server_state = ServerState::new();
-    let (username, user_info) = loop {
-        match user_repo.get_single_user().await? {
-            None => {
-                sleep(Duration::from_secs(5)).await;
-                continue;
+    let (username, user_info) = match config.username() {
+        None => loop {
+            match user_repo.get_single_user().await? {
+                None => {
+                    sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+                Some(element) => break element,
             }
-            Some(element) => break element,
+        },
+        Some(username) => {
+            let user_info = user_repo
+                .get_user(username)
+                .await?
+                .ok_or(CommonError::Other(format!(
+                    "Can not get user info from repository: {username}"
+                )))?;
+            (username.to_owned(), user_info)
         }
     };
     info!("Start agent server with username: {}", &username);

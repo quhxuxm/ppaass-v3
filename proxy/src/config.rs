@@ -56,6 +56,8 @@ pub struct ForwardConfig {
     proxy_frame_buffer_size: usize,
     #[access(get)]
     connection_pool: Option<DefaultConnectionPoolConfig>,
+    #[access(get)]
+    username: Option<String>,
 }
 
 impl ProxyTcpConnectionConfig for ForwardConfig {

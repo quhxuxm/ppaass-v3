@@ -13,6 +13,8 @@ pub struct AgentConfig {
     server_port: u16,
     worker_thread_number: usize,
     #[access(get)]
+    username: Option<String>,
+    #[access(get)]
     log_dir: PathBuf,
     #[access(get(ty=&str))]
     log_name_prefix: String,

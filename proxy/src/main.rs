@@ -86,13 +86,24 @@ async fn start_server(
                 },
             )?);
         let forward_proxy_user_repo = Arc::new(forward_fs_user_repo);
-        let (forward_username, forward_proxy_user_info) = loop {
-            match forward_proxy_user_repo.get_single_user().await? {
-                None => {
-                    sleep(Duration::from_secs(5)).await;
-                    continue;
+        let (forward_username, forward_proxy_user_info) = match forward_config.username() {
+            None => loop {
+                match forward_proxy_user_repo.get_single_user().await? {
+                    None => {
+                        sleep(Duration::from_secs(5)).await;
+                        continue;
+                    }
+                    Some(element) => break element,
                 }
-                Some(element) => break element,
+            },
+            Some(forward_username) => {
+                let user_info = forward_proxy_user_repo
+                    .get_user(forward_username)
+                    .await?
+                    .ok_or(CommonError::Other(format!(
+                        "Can not get forward user info from repository: {forward_username}"
+                    )))?;
+                (forward_username.to_owned(), user_info)
             }
         };
         server_state.add_value((forward_username.clone(), forward_proxy_user_info.clone()));
