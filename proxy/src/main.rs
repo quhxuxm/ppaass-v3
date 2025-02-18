@@ -69,12 +69,8 @@ async fn start_server(
     server_state.add_value(agent_user_repo.clone());
     if let Some(forward_config) = config.forward() {
         let forward_config = Arc::new(forward_config.clone());
-        let forward_fs_user_repo =
-            ForwardProxyUserRepository::new(FileSystemUserInfoRepository::new::<
-                FsAgentUserInfoContent,
-                _,
-                _,
-            >(
+        let forward_fs_user_repo = ForwardProxyUserRepository::new(
+            FileSystemUserInfoRepository::new::<FsAgentUserInfoContent, _, _>(
                 config.user_info_repository_refresh_interval(),
                 forward_config.user_dir(),
                 |user_info, content| async move {
@@ -84,13 +80,15 @@ async fn start_server(
                         content.proxy_servers().to_owned(),
                     );
                 },
-            )?);
+            )
+            .await?,
+        );
         let forward_proxy_user_repo = Arc::new(forward_fs_user_repo);
         let (forward_username, forward_proxy_user_info) = match forward_config.username() {
             None => loop {
                 match forward_proxy_user_repo.get_single_user().await? {
                     None => {
-                        sleep(Duration::from_secs(5)).await;
+                        sleep(Duration::from_millis(500)).await;
                         continue;
                     }
                     Some(element) => break element,
@@ -155,7 +153,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     );
                 }
             },
-        ) {
+        )
+        .await
+        {
             Ok(fs_user_repo) => fs_user_repo,
             Err(e) => {
                 error!("Fail to start proxy server when create user info repository: {e:?}");

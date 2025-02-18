@@ -42,7 +42,9 @@ fn main() -> Result<(), Box<dyn StdError>> {
                     content.proxy_servers().to_owned(),
                 );
             },
-        ) {
+        )
+        .await
+        {
             Ok(fs_user_repo) => fs_user_repo,
             Err(e) => {
                 error!("Fail to start agent server when create user info repository: {e:?}");

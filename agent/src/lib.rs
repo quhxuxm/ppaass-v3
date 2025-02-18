@@ -56,7 +56,7 @@ pub async fn start_server(
         None => loop {
             match user_repo.get_single_user().await? {
                 None => {
-                    sleep(Duration::from_secs(5)).await;
+                    sleep(Duration::from_millis(500)).await;
                     continue;
                 }
                 Some(element) => break element,
