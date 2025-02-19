@@ -51,14 +51,9 @@ pub async fn handle_client_connection(
         }
         SOCKS4_VERSION => {
             debug!("Client tcp stream using socks4 protocol: {client_socket_addr}");
-            socks4_protocol_proxy(
-                TfoStream::from(client_tcp_stream),
-                client_socket_addr,
-                &config,
-                user_info,
-                server_state,
-            )
-            .await
+            Err(CommonError::Other(
+                "Socks4 proxy is not supported".to_owned(),
+            ))
         }
         _ => {
             debug!("Client tcp stream using http protocol: {client_socket_addr}");
