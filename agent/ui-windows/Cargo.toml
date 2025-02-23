@@ -1,0 +1,8 @@
+[package]
+name = "ui-windows"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+nwg = { workspace = true }
+nwd = { workspace = true }
