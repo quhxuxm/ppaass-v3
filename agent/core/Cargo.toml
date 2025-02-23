@@ -5,7 +5,7 @@ edition = "2024"
 
 [[bin]]
 path = "src/bin/start.rs"
-name = "agent"
+name = "agent-cli"
 
 [lib]
 path = "src/lib.rs"

@@ -5,11 +5,11 @@ edition = "2024"
 
 [lib]
 path = "src/lib.rs"
-name = "ppaass_ui_windows"
+name = "ppaass_agent_ui_windows"
 
 [[bin]]
 path = "src/bin/start.rs"
-name = "ppaass-agent-windows"
+name = "agent-ui"
 
 [dependencies]
 nwg = { workspace = true }
