@@ -1,8 +1,9 @@
 use crate::tunnel::destination::DestinationEdge;
-use crate::ProxyConfig;
+
 use futures_util::StreamExt;
 use ppaass_common::error::CommonError;
 
+use crate::config::ProxyConfig;
 use ppaass_common::server::{ServerState, ServerTcpStream};
 use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
 use ppaass_common::{
@@ -64,7 +65,9 @@ impl Tunnel {
                 keep_alive,
             } => match config.forward() {
                 None => {
-                    debug!("[START TCP] Begin to initialize tunnel for agent: {agent_socket_address:?}");
+                    debug!(
+                        "[START TCP] Begin to initialize tunnel for agent: {agent_socket_address:?}"
+                    );
                     let destination_edge = DestinationEdge::start_tcp(
                         destination_address,
                         keep_alive,
@@ -74,7 +77,9 @@ impl Tunnel {
                     Ok(destination_edge)
                 }
                 Some(forward_config) => {
-                    debug!("[START FORWARD] Begin to initialize tunnel for agent: {agent_socket_address:?}");
+                    debug!(
+                        "[START FORWARD] Begin to initialize tunnel for agent: {agent_socket_address:?}"
+                    );
                     let destination_edge = DestinationEdge::start_forward(
                         server_state,
                         forward_config,
@@ -122,7 +127,9 @@ impl Tunnel {
                         destination_tcp_endpoint.destination_address().clone();
                     let destination_tcp_endpoint = StreamReader::new(destination_tcp_endpoint);
                     let mut destination_tcp_connection = SinkWriter::new(destination_tcp_endpoint);
-                    debug!("[PROXYING] Going to copy bidirectional between agent [{agent_socket_address}] and destination [{destination_address}]");
+                    debug!(
+                        "[PROXYING] Going to copy bidirectional between agent [{agent_socket_address}] and destination [{destination_address}]"
+                    );
                     let (agent_data_size, destination_data_size) = copy_bidirectional_with_sizes(
                         &mut agent_tcp_connection,
                         &mut destination_tcp_connection,
@@ -130,7 +137,9 @@ impl Tunnel {
                         self.config.destination_to_proxy_data_relay_buffer_size(),
                     )
                     .await?;
-                    debug!("[PROXYING] Copy data between agent and destination, agent data size: {agent_data_size}, destination data size: {destination_data_size}");
+                    debug!(
+                        "[PROXYING] Copy data between agent and destination, agent data size: {agent_data_size}, destination data size: {destination_data_size}"
+                    );
                     Ok(())
                 }
                 DestinationEdge::Forward(mut forward_proxy_tcp_connection) => {
@@ -140,13 +149,17 @@ impl Tunnel {
                         .await?;
                     let agent_socket_address = agent_tcp_connection.agent_socket_address();
                     let proxy_socket_address = forward_proxy_tcp_connection.proxy_socket_address();
-                    debug!("[FORWARDING] Going to copy bidirectional between agent [{agent_socket_address}] and proxy [{proxy_socket_address}]");
+                    debug!(
+                        "[FORWARDING] Going to copy bidirectional between agent [{agent_socket_address}] and proxy [{proxy_socket_address}]"
+                    );
                     let (agent_data_size, proxy_data_size) = copy_bidirectional(
                         &mut agent_tcp_connection,
                         &mut forward_proxy_tcp_connection,
                     )
                     .await?;
-                    debug!("[FORWARDING] Copy data between agent and proxy, agent data size: {agent_data_size}, proxy data size: {proxy_data_size}");
+                    debug!(
+                        "[FORWARDING] Copy data between agent and proxy, agent data size: {agent_data_size}, proxy data size: {proxy_data_size}"
+                    );
                     Ok(())
                 }
                 DestinationEdge::Udp(destination_udp_endpoint) => {

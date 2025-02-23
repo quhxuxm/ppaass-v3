@@ -1,6 +1,6 @@
 mod tcp;
 mod udp;
-use crate::ForwardConfig;
+use crate::config::ForwardConfig;
 use ppaass_common::config::ProxyTcpConnectionConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
@@ -62,7 +62,9 @@ impl DestinationEdge {
                 keep_alive: false,
             })
             .await?;
-        debug!("Success to send init tunnel request on forward proxy tcp connection: {proxy_socket_address}, destination address: {destination_address:?}");
+        debug!(
+            "Success to send init tunnel request on forward proxy tcp connection: {proxy_socket_address}, destination address: {destination_address:?}"
+        );
         Ok(Self::Forward(proxy_tcp_connection))
     }
 

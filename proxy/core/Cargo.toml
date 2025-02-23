@@ -1,10 +1,18 @@
 [package]
-name = "proxy"
+name = "proxy-core"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+path = "src/lib.rs"
+name = "ppaass_proxy_core"
+
+[[bin]]
+path = "src/bin/start.rs"
+name = "proxy"
+
 [dependencies]
-ppaass-common = { path = "../common", package = "common" }
+ppaass-common = { path = "../../common", package = "common" }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 thiserror = { workspace = true }

@@ -1,7 +1,7 @@
 use clap::Parser;
-use ppaass_agent::start_server;
-use ppaass_agent::AgentConfig;
-use ppaass_agent::Command;
+use ppaass_agent_core::AgentConfig;
+use ppaass_agent_core::Command;
+use ppaass_agent_core::start_server;
 use ppaass_common::config::ServerConfig;
 use ppaass_common::init_logger;
 use ppaass_common::user::repo::fs::{
