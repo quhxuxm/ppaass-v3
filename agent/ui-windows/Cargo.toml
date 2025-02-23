@@ -3,6 +3,14 @@ name = "ui-windows"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+path = "src/lib.rs"
+name = "ppaass_ui_windows"
+
+[[bin]]
+path = "src/bin/start.rs"
+name = "ppaass-agent-windows"
+
 [dependencies]
 nwg = { workspace = true }
 nwd = { workspace = true }
