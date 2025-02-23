@@ -1,5 +1,5 @@
 [package]
-name = "ui-windows"
+name = "agent-ui-windows"
 version = "0.1.0"
 edition = "2024"
 
@@ -12,5 +12,5 @@ path = "src/bin/start.rs"
 name = "agent-ui"
 
 [dependencies]
-nwg = { workspace = true }
-nwd = { workspace = true }
+nwg = { workspace = true, package = "native-windows-gui" }
+nwd = { workspace = true, package = "native-windows-derive" }
