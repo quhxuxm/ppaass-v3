@@ -100,4 +100,10 @@ impl ProxyTcpConnectionPoolConfig for ForwardConfig {
             Some(pool_config) => pool_config.heartbeat_timeout(),
         }
     }
+    fn retake_interval(&self) -> u64 {
+        match &self.connection_pool {
+            None => 2,
+            Some(pool_config) => pool_config.retake_interval(),
+        }
+    }
 }

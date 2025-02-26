@@ -74,6 +74,12 @@ impl ProxyTcpConnectionPoolConfig for AgentConfig {
             None => 0,
         }
     }
+    fn retake_interval(&self) -> u64 {
+        match self.connection_pool {
+            Some(ref pool) => pool.retake_interval(),
+            None => 2,
+        }
+    }
 }
 
 impl ServerConfig for AgentConfig {

@@ -151,7 +151,9 @@ where
                         continue 'for_each_connection;
                     }
                     if proxy_tcp_connection_pool_element.need_close() {
-                        debug!("Close proxy connection because of it exceed max life time: {proxy_tcp_connection_pool_element:?}");
+                        debug!(
+                            "Close proxy connection because of it exceed max life time: {proxy_tcp_connection_pool_element:?}"
+                        );
                         continue 'for_each_connection;
                     }
                     let checking_tx = checking_tx.clone();
@@ -203,27 +205,28 @@ where
         user_info: Arc<RwLock<UserInfo>>,
         username: &str,
     ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
-        let mut pool_lock = pool.lock().await;
-        debug!(
-            "Taking proxy connection, current pool size: {}",
-            pool_lock.len()
-        );
-        let proxy_tcp_connection_element = pool_lock.pop();
-        match proxy_tcp_connection_element {
-            None => {
-                drop(pool_lock);
-                Self::fill_pool(pool.clone(), config.clone(), user_info.clone(), username).await;
-                Box::pin(Self::concrete_take_proxy_connection(
-                    pool, config, user_info, username,
-                ))
-                .await
-            }
-            Some(proxy_tcp_connection_element) => {
-                debug!(
-                    "Proxy connection available, current pool size before take: {}",
-                    pool_lock.len()
-                );
-                Ok(proxy_tcp_connection_element.proxy_tcp_connection)
+        loop {
+            let mut pool_lock = pool.lock().await;
+            debug!(
+                "Taking proxy connection, current pool size: {}",
+                pool_lock.len()
+            );
+            let proxy_tcp_connection_element = pool_lock.pop();
+            match proxy_tcp_connection_element {
+                None => {
+                    drop(pool_lock);
+                    Self::fill_pool(pool.clone(), config.clone(), user_info.clone(), username)
+                        .await;
+                    sleep(Duration::from_secs(config.retake_interval())).await;
+                    continue;
+                }
+                Some(proxy_tcp_connection_element) => {
+                    debug!(
+                        "Proxy connection available, current pool size before take: {}",
+                        pool_lock.len()
+                    );
+                    return Ok(proxy_tcp_connection_element.proxy_tcp_connection);
+                }
             }
         }
     }
@@ -237,7 +240,11 @@ where
         let max_pool_size = config.max_pool_size();
         let mut pool_lock = pool.lock().await;
         if pool_lock.len() >= max_pool_size {
-            debug!("Cancel filling proxy connection pool, because the pool size exceed max, current pool size: {}, max pool size: {}", pool_lock.len(), max_pool_size);
+            debug!(
+                "Cancel filling proxy connection pool, because the pool size exceed max, current pool size: {}, max pool size: {}",
+                pool_lock.len(),
+                max_pool_size
+            );
             return;
         }
         debug!(

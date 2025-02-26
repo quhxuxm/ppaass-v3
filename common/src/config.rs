@@ -6,6 +6,7 @@ pub trait ProxyTcpConnectionPoolConfig {
     fn check_interval(&self) -> u64;
     fn connection_max_alive(&self) -> i64;
     fn heartbeat_timeout(&self) -> u64;
+    fn retake_interval(&self) -> u64;
 }
 
 pub trait ProxyTcpConnectionConfig {
@@ -26,6 +27,7 @@ pub struct DefaultConnectionPoolConfig {
     check_interval: u64,
     connection_max_alive: i64,
     heartbeat_timeout: u64,
+    retake_interval: u64,
 }
 
 impl ProxyTcpConnectionPoolConfig for DefaultConnectionPoolConfig {
@@ -43,5 +45,8 @@ impl ProxyTcpConnectionPoolConfig for DefaultConnectionPoolConfig {
     }
     fn heartbeat_timeout(&self) -> u64 {
         self.heartbeat_timeout
+    }
+    fn retake_interval(&self) -> u64 {
+        self.retake_interval
     }
 }
