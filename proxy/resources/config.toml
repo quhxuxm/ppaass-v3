@@ -21,4 +21,4 @@ user_info_repository_refresh_interval = 120
 #check_interval = 60
 #connection_max_alive = 120
 #heartbeat_timeout = 10
-
+#retake_interval = 2
