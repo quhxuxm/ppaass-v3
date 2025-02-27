@@ -1,5 +1,5 @@
 [workspace]
-members = ["agent/core", "agent/ui-windows", "common", "protocol", "proxy/core", "proxy/tool"]
+members = ["agent/core", "agent/ui/src-tauri", "common", "protocol", "proxy/core", "proxy/tool"]
 resolver = "2"
 
 [profile.release]
@@ -42,5 +42,3 @@ bytes = "1.10.0"
 cbc = "0.1.2"
 anyhow = "1.0.95"
 zip = "2.2.2"
-nwg = { package = "native-windows-gui", version = "1.0.13" }
-nwd = { package = "native-windows-derive", version = "1.0.5" }
