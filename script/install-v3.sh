@@ -49,8 +49,8 @@ cargo build --release --package proxy-core --package proxy-tool
 sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/* /ppaass-v3/build/resources
 sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/agent_user/* /ppaass-v3/build/resources/agent_user
 sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/forward_user/* /ppaass-v3/build/resources/forward_user
-sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/proxy /ppaass-v3/build/ppaass-v3-proxy
-sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/tool /ppaass-v3/build/ppaass-v3-tool
+sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/proxy-cli /ppaass-v3/build/ppaass-v3-proxy
+sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/proxy-tool /ppaass-v3/build/ppaass-v3-tool
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/script/* /ppaass-v3/build/
 
 sudo chmod 777 /ppaass-v3/build

@@ -1,7 +1,7 @@
 use clap::Parser;
+use command::Command;
 use ppaass_common::server::{CommonServer, Server, ServerListener, ServerState};
 use ppaass_common::{ProxyTcpConnectionPool, init_logger};
-use ppaass_proxy_core::command::Command;
 pub use ppaass_proxy_core::config::*;
 
 use ppaass_proxy_core::tunnel::handle_agent_connection;
@@ -22,6 +22,7 @@ use tokio::runtime::Builder;
 use tokio::time::sleep;
 use tokio_tfo::TfoListener;
 use tracing::{debug, error, trace};
+pub mod command;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 

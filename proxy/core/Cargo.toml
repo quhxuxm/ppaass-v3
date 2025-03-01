@@ -3,14 +3,6 @@ name = "proxy-core"
 version = "0.1.0"
 edition = "2024"
 
-[lib]
-path = "src/lib.rs"
-name = "ppaass_proxy_core"
-
-[[bin]]
-path = "src/bin/start.rs"
-name = "proxy"
-
 [dependencies]
 ppaass-common = { path = "../../common", package = "common" }
 tokio = { workspace = true, features = ["full"] }
@@ -21,9 +13,5 @@ serde = { workspace = true, features = ["derive"] }
 tokio-util = { workspace = true, features = ["codec", "io"] }
 futures-util = { workspace = true, features = ["sink"] }
 bincode = { workspace = true }
-clap = { workspace = true, features = ["derive"] }
-toml = { workspace = true }
-rand = { workspace = true }
 tokio-tfo = { workspace = true }
-mimalloc = { workspace = true }
 async-trait = { workspace = true }

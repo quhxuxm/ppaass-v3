@@ -1,1 +1,1 @@
-agent -c resources/config.toml
+agent-cli -c resources/config.toml

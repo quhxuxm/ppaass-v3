@@ -3,13 +3,8 @@ name = "agent-core"
 version = "0.1.0"
 edition = "2024"
 
-[[bin]]
-path = "src/bin/start.rs"
-name = "agent-cli"
-
 [lib]
 path = "src/lib.rs"
-name = "ppaass_agent_core"
 
 [dependencies]
 ppaass-common = { path = "../../common", package = "common" }
@@ -19,12 +14,9 @@ tokio = { workspace = true, features = ["full"] }
 thiserror = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 accessory = { workspace = true }
-clap = { workspace = true, features = ["derive"] }
-toml = { workspace = true }
 tracing = { workspace = true }
 bincode = { workspace = true }
 http-body-util = { workspace = true }
 tower = { workspace = true }
 socks5-impl = { workspace = true, features = ["tokio"] }
 tokio-tfo = { workspace = true }
-mimalloc = { workspace = true }

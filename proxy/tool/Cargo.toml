@@ -7,7 +7,7 @@ edition = "2024"
 path = "src/lib.rs"
 [[bin]]
 path = "src/bin/start.rs"
-name = "tool"
+name = "proxy-tool"
 
 [dependencies]
 ppaass-common = { path = "../../common", package = "common" }

@@ -1,6 +1,6 @@
 use clap::Parser;
+use command::Command;
 use ppaass_agent_core::AgentConfig;
-use ppaass_agent_core::Command;
 use ppaass_agent_core::start_server;
 use ppaass_common::config::ServerConfig;
 use ppaass_common::init_logger;
@@ -13,6 +13,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::runtime::Builder;
 use tracing::error;
+pub mod command;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
