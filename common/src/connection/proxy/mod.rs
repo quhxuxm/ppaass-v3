@@ -2,8 +2,8 @@ mod connection;
 mod pool;
 use crate::error::CommonError;
 use crate::parse_to_socket_addresses;
-use crate::user::repo::fs::USER_INFO_ADDITION_INFO_PROXY_SERVERS;
 use crate::user::UserInfo;
+use crate::user::repo::fs::USER_INFO_ADDITION_INFO_PROXY_SERVERS;
 pub use connection::*;
 pub use pool::*;
 fn select_proxy_tcp_connection_info(

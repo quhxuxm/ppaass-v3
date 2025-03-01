@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Parser;
 use proxy_tool::command::{ToolCommand, ToolSubCommand};
 use proxy_tool::config::ProxyToolConfig;
-use proxy_tool::handler::generate_user::{generate_user, GenerateUserHandlerArgument};
+use proxy_tool::handler::generate_user::{GenerateUserHandlerArgument, generate_user};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::Arc;

@@ -40,5 +40,5 @@ impl UserInfo {
 pub trait UserInfoRepository {
     async fn get_user(&self, username: &str) -> Result<Option<Arc<RwLock<UserInfo>>>, CommonError>;
     async fn get_single_user(&self)
-        -> Result<Option<(String, Arc<RwLock<UserInfo>>)>, CommonError>;
+    -> Result<Option<(String, Arc<RwLock<UserInfo>>)>, CommonError>;
 }

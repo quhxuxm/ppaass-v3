@@ -1,7 +1,7 @@
 use ppaass_common::crypto::{
-    EncodePrivateKey, EncodePublicKey, LineEnding, OsRng, RsaPrivateKey, RsaPublicKey,
     DEFAULT_AGENT_PRIVATE_KEY_PATH, DEFAULT_AGENT_PUBLIC_KEY_PATH, DEFAULT_PROXY_PRIVATE_KEY_PATH,
-    DEFAULT_PROXY_PUBLIC_KEY_PATH,
+    DEFAULT_PROXY_PUBLIC_KEY_PATH, EncodePrivateKey, EncodePublicKey, LineEnding, OsRng,
+    RsaPrivateKey, RsaPublicKey,
 };
 use ppaass_common::error::CommonError;
 use std::fs;

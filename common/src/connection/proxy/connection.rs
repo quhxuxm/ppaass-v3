@@ -200,7 +200,7 @@ impl ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState> {
                         ) => Err(CommonError::Other(format!(
                             "Tunnel init fail on connect destination: {tunnel_init_response:?}",
                         ))),
-                    }
+                    };
                 }
             }
         }

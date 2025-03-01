@@ -4,8 +4,8 @@ use crate::connection::codec::{
 
 use crate::connection::CryptoLengthDelimitedFramed;
 use crate::error::CommonError;
-use crate::user::repo::fs::USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME;
 use crate::user::UserInfoRepository;
+use crate::user::repo::fs::USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME;
 use crate::{random_generate_encryption, rsa_decrypt_encryption, rsa_encrypt_encryption};
 use chrono::{DateTime, Utc};
 use futures_util::{Sink, StreamExt};
@@ -141,7 +141,10 @@ where
                 .ok_or(CommonError::ConnectionExhausted(self.agent_socket_address))??;
             match tunnel_ctl_request {
                 TunnelControlRequest::Heartbeat(heartbeat_request) => {
-                    debug!("Receive heartbeat request from agent connection [{}]: {heartbeat_request:?}", self.agent_socket_address);
+                    debug!(
+                        "Receive heartbeat request from agent connection [{}]: {heartbeat_request:?}",
+                        self.agent_socket_address
+                    );
                     let heartbeat_response =
                         TunnelControlResponse::Heartbeat(HeartbeatResponse::new());
                     self.state
@@ -151,7 +154,7 @@ where
                     continue;
                 }
                 TunnelControlRequest::TunnelInit(tunnel_init_request) => {
-                    return Ok(tunnel_init_request)
+                    return Ok(tunnel_init_request);
                 }
             }
         }

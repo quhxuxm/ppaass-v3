@@ -6,12 +6,12 @@ use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs::{read_dir, File};
+use std::fs::{File, read_dir};
 use std::future::Future;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
@@ -154,7 +154,9 @@ impl FileSystemUserInfoRepository {
             };
             let file_name_parts = file_name.split('.').collect::<Vec<&str>>();
             if file_name_parts.len() < 2 {
-                error!("Fail to read [{user_repo_dir_path:?}{file_name:?}] because of the file name is not in 2 parts",);
+                error!(
+                    "Fail to read [{user_repo_dir_path:?}{file_name:?}] because of the file name is not in 2 parts",
+                );
                 continue;
             }
             let username = file_name_parts[0];

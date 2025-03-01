@@ -5,8 +5,8 @@ pub use rsa::pkcs8::EncodePublicKey;
 pub use rsa::pkcs8::LineEnding;
 pub use rsa::rand_core::OsRng;
 use rsa::{
-    pkcs8::{DecodePrivateKey, DecodePublicKey},
     Pkcs1v15Encrypt,
+    pkcs8::{DecodePrivateKey, DecodePublicKey},
 };
 pub use rsa::{RsaPrivateKey, RsaPublicKey};
 use std::fmt::Debug;

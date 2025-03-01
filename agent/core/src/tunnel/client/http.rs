@@ -52,7 +52,9 @@ async fn client_http_request_handler(
             port: destination_port.unwrap_or(80),
         }
     };
-    debug!("Receive client http request to destination: {destination_address:?}, client socket address: {client_socket_addr}");
+    debug!(
+        "Receive client http request to destination: {destination_address:?}, client socket address: {client_socket_addr}"
+    );
     let proxy_tcp_connection_pool =
         server_state.get_value::<Arc<ProxyTcpConnectionPool<AgentConfig>>>();
     let proxy_tcp_connection = match proxy_tcp_connection_pool {

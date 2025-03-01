@@ -1,6 +1,6 @@
 use crate::config::ProxyToolConfig;
 use crate::crypto::{generate_agent_key_pairs, generate_proxy_key_pairs};
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use chrono::{TimeDelta, Utc};
 use ppaass_common::crypto::{
     DEFAULT_AGENT_PRIVATE_KEY_PATH, DEFAULT_AGENT_PUBLIC_KEY_PATH, DEFAULT_PROXY_PRIVATE_KEY_PATH,
@@ -8,7 +8,7 @@ use ppaass_common::crypto::{
 };
 use ppaass_common::generate_uuid;
 use ppaass_common::user::repo::fs::{
-    FsAgentUserInfoContent, FsProxyUserInfoContent, FS_USER_INFO_CONFIG_FILE_NAME,
+    FS_USER_INFO_CONFIG_FILE_NAME, FsAgentUserInfoContent, FsProxyUserInfoContent,
 };
 use std::io::Write;
 use std::net::SocketAddr;
