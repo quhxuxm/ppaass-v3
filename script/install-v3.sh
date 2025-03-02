@@ -43,7 +43,7 @@ sudo chmod 777 ppaass-v3
 cd /ppaass-v3/sourcecode/ppaass-v3
 sudo git pull
 
-cargo build --release --package proxy-core --package proxy-tool
+cargo build --release --package proxy-cli --package proxy-tool
 
 # ps -ef | grep gradle | grep -v grep | awk '{print $2}' | xargs kill -9
 sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/* /ppaass-v3/build/resources
