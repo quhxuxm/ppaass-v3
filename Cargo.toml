@@ -1,5 +1,5 @@
 [workspace]
-members = ["agent/cli", "agent/core", "agent/gui/src-tauri", "common", "protocol", "proxy/cli", "proxy/core", "proxy/tool"]
+members = ["agent/cli", "agent/core", "common", "protocol", "proxy/cli", "proxy/core", "proxy/tool"]
 resolver = "2"
 
 [profile.release]
