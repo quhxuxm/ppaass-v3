@@ -6,14 +6,14 @@ use std::net::SocketAddr;
 use std::pin::Pin;
 use std::task::{Context, Poll};
 use std::time::Duration;
+use tokio::net::TcpStream;
 use tokio::time::timeout;
-use tokio_tfo::TfoStream;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{BytesCodec, Framed};
 use tracing::debug;
 
 pub struct DestinationTcpEndpoint {
-    destination_tcp_framed: Framed<TfoStream, BytesCodec>,
+    destination_tcp_framed: Framed<TcpStream, BytesCodec>,
     destination_address: UnifiedAddress,
 }
 
@@ -31,7 +31,7 @@ impl DestinationTcpEndpoint {
             })?;
         let destination_tcp_stream = timeout(
             Duration::from_secs(connect_timeout),
-            TfoStream::connect(destination_socks_addrs.as_slice()[0]),
+            TcpStream::connect(destination_socks_addrs.as_slice()),
         )
         .await??;
         destination_tcp_stream.set_nodelay(true)?;
