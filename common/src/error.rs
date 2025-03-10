@@ -21,7 +21,9 @@ pub enum CommonError {
     #[error("Connection exhausted: {0}")]
     ConnectionExhausted(SocketAddr),
     #[error(transparent)]
-    Bincode(#[from] bincode::Error),
+    BincodeEncode(#[from] bincode::error::EncodeError),
+    #[error(transparent)]
+    BincodeDecode(#[from] bincode::error::DecodeError),
     #[error(transparent)]
     Protocol(#[from] ProtocolError),
     #[error(transparent)]

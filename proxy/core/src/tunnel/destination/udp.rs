@@ -56,7 +56,10 @@ impl DestinationUdpEndpoint {
                 source_address,
                 payload: destination_udp_data.to_vec().into(),
             };
-            let udp_relay_data_response_bytes = match bincode::serialize(&udp_relay_data_response) {
+            let udp_relay_data_response_bytes = match bincode::serde::encode_to_vec(
+                &udp_relay_data_response,
+                bincode::config::standard(),
+            ) {
                 Ok(udp_relay_data_response_bytes) => udp_relay_data_response_bytes,
                 Err(e) => {
                     error!("Fail to serialize udp relay data: {}", e);

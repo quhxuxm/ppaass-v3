@@ -27,7 +27,8 @@ impl Decoder for TunnelControlRequestResponseCodec {
         match raw_bytes {
             None => Ok(None),
             Some(raw_bytes) => {
-                let tunnel_ctl_request: TunnelControlRequest = bincode::deserialize(&raw_bytes)?;
+                let (tunnel_ctl_request, _) =
+                    bincode::serde::decode_from_slice(&raw_bytes, bincode::config::standard())?;
                 Ok(Some(tunnel_ctl_request))
             }
         }
@@ -41,7 +42,7 @@ impl Encoder<TunnelControlResponse> for TunnelControlRequestResponseCodec {
         item: TunnelControlResponse,
         dst: &mut BytesMut,
     ) -> Result<(), Self::Error> {
-        let raw_bytes = bincode::serialize(&item)?;
+        let raw_bytes = bincode::serde::encode_to_vec(&item, bincode::config::standard())?;
         self.crypto_length_delimited_codec
             .encode(BytesMut::from_iter(raw_bytes), dst)
     }

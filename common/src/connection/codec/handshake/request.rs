@@ -22,7 +22,8 @@ impl Decoder for HandshakeRequestDecoder {
         match raw_bytes {
             None => Ok(None),
             Some(raw_bytes) => {
-                let handshake = bincode::deserialize::<HandshakeRequest>(&raw_bytes)?;
+                let (handshake, _) =
+                    bincode::serde::decode_from_slice(&raw_bytes, bincode::config::standard())?;
                 Ok(Some(handshake))
             }
         }
@@ -44,7 +45,7 @@ impl HandshakeRequestEncoder {
 impl Encoder<HandshakeRequest> for HandshakeRequestEncoder {
     type Error = CommonError;
     fn encode(&mut self, item: HandshakeRequest, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let raw_bytes = bincode::serialize(&item)?;
+        let raw_bytes = bincode::serde::encode_to_vec(&item, bincode::config::standard())?;
         self.length_delimited_codec
             .encode(raw_bytes.into(), dst)
             .map_err(Into::into)

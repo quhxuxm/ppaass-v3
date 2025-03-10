@@ -170,16 +170,20 @@ impl Tunnel {
                     let agent_tcp_connection = Arc::new(Mutex::new(agent_tcp_connection));
                     loop {
                         let agent_tcp_connection = agent_tcp_connection.clone();
-                        let UdpRelayDataRequest {
-                            destination_address,
-                            source_address,
-                            payload,
-                        } = match agent_tcp_connection.lock().await.next().await {
+                        let (
+                            UdpRelayDataRequest {
+                                destination_address,
+                                source_address,
+                                payload,
+                            },
+                            _,
+                        ) = match agent_tcp_connection.lock().await.next().await {
                             None => return Ok(()),
                             Some(Err(e)) => return Err(e),
-                            Some(Ok(agent_data)) => {
-                                bincode::deserialize::<UdpRelayDataRequest>(&agent_data)?
-                            }
+                            Some(Ok(agent_data)) => bincode::serde::decode_from_slice(
+                                &agent_data,
+                                bincode::config::standard(),
+                            )?,
                         };
                         destination_udp_endpoint
                             .replay(

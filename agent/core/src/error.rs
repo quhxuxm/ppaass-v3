@@ -6,7 +6,9 @@ pub enum AgentError {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
-    Bincode(#[from] bincode::Error),
+    BincodeEncode(#[from] bincode::error::EncodeError),
+    #[error(transparent)]
+    BincodeDecode(#[from] bincode::error::DecodeError),
     #[error(transparent)]
     Common(#[from] CommonError),
 }

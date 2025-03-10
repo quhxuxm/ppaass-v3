@@ -17,7 +17,7 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["chrono"] }
 tracing-appender = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
-bincode = { workspace = true }
+bincode = { workspace = true, features = ["serde"] }
 hyper = { workspace = true }
 tokio-util = { workspace = true, features = ["codec", "io", "io-util"] }
 futures-util = { workspace = true, features = ["sink"] }
