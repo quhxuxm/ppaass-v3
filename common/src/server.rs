@@ -6,7 +6,6 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
-use tokio_tfo::{TfoListener, TfoStream};
 use tracing::{error, info};
 pub struct ServerState {
     values: HashMap<TypeId, Arc<dyn Any + Send + Sync + 'static>>,
@@ -33,39 +32,16 @@ impl ServerState {
     }
 }
 
-pub enum ServerTcpStream {
-    TcpStream(TcpStream),
-    TfoStream(TfoStream),
-}
-impl ServerTcpStream {
-    pub(crate) fn set_nodelay(&self, val: bool) -> Result<(), CommonError> {
-        match self {
-            ServerTcpStream::TcpStream(stream) => {
-                stream.set_nodelay(val)?;
-                Ok(())
-            }
-            ServerTcpStream::TfoStream(stream) => {
-                stream.set_nodelay(val)?;
-                Ok(())
-            }
-        }
-    }
-}
 pub enum ServerListener {
     TcpListener(TcpListener),
-    TfoListener(TfoListener),
 }
 
 impl ServerListener {
-    pub async fn accept(&self) -> Result<(ServerTcpStream, SocketAddr), CommonError> {
+    pub async fn accept(&self) -> Result<(TcpStream, SocketAddr), CommonError> {
         match self {
             ServerListener::TcpListener(tcp_listener) => {
                 let accept_result = tcp_listener.accept().await?;
-                Ok((ServerTcpStream::TcpStream(accept_result.0), accept_result.1))
-            }
-            ServerListener::TfoListener(tfo_listener) => {
-                let accept_result = tfo_listener.accept().await?;
-                Ok((ServerTcpStream::TfoStream(accept_result.0), accept_result.1))
+                Ok((accept_result.0, accept_result.1))
             }
         }
     }
@@ -89,7 +65,7 @@ where
     where
         F1: Fn(Arc<C>) -> Fut1 + Send + Sync + 'static,
         Fut1: Future<Output = Result<ServerListener, CommonError>> + Send + 'static,
-        F2: Fn(Arc<C>, Arc<ServerState>, ServerTcpStream, SocketAddr) -> Fut2
+        F2: Fn(Arc<C>, Arc<ServerState>, TcpStream, SocketAddr) -> Fut2
             + Send
             + Sync
             + Clone

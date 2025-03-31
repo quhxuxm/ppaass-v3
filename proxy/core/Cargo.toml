@@ -13,5 +13,4 @@ serde = { workspace = true, features = ["derive"] }
 tokio-util = { workspace = true, features = ["codec", "io"] }
 futures-util = { workspace = true, features = ["sink"] }
 bincode = { workspace = true }
-tokio-tfo = { workspace = true }
 async-trait = { workspace = true }

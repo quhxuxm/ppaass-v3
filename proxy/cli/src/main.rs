@@ -18,9 +18,8 @@ use ppaass_common::user::repo::fs::{
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::runtime::Builder;
 use tokio::time::sleep;
-use tokio_tfo::TfoListener;
+use tokio::{net::TcpListener, runtime::Builder};
 use tracing::{debug, error, trace};
 pub mod command;
 #[global_allocator]
@@ -34,8 +33,8 @@ async fn create_server_listener(config: Arc<ProxyConfig>) -> Result<ServerListen
             "Starting server listener with IPv6 on port: {}",
             config.server_port()
         );
-        Ok(ServerListener::TfoListener(
-            TfoListener::bind(SocketAddr::new(
+        Ok(ServerListener::TcpListener(
+            TcpListener::bind(SocketAddr::new(
                 IpAddr::V6(Ipv6Addr::UNSPECIFIED),
                 config.server_port(),
             ))
@@ -46,8 +45,8 @@ async fn create_server_listener(config: Arc<ProxyConfig>) -> Result<ServerListen
             "Starting server listener with IPv4 on port: {}",
             config.server_port()
         );
-        Ok(ServerListener::TfoListener(
-            TfoListener::bind(SocketAddr::new(
+        Ok(ServerListener::TcpListener(
+            TcpListener::bind(SocketAddr::new(
                 IpAddr::V4(Ipv4Addr::UNSPECIFIED),
                 config.server_port(),
             ))

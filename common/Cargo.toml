@@ -22,7 +22,6 @@ hyper = { workspace = true }
 tokio-util = { workspace = true, features = ["codec", "io", "io-util"] }
 futures-util = { workspace = true, features = ["sink"] }
 async-trait = { workspace = true }
-tokio-tfo = { workspace = true }
 chrono = { workspace = true, features = ["serde"] }
 serde = { workspace = true }
 bytes = { workspace = true }
