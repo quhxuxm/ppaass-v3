@@ -1,11 +1,11 @@
 use crate::config::AgentConfig;
-
 use ppaass_common::config::ProxyTcpConnectionConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
 use ppaass_common::user::UserInfo;
 use ppaass_common::{
-    ProxyTcpConnection, ProxyTcpConnectionPool, TunnelInitRequest, UnifiedAddress,
+    FramedConnection, ProxyTcpConnectionNewState, ProxyTcpConnectionPool, TunnelInitRequest,
+    UnifiedAddress,
 };
 use socks5_impl::protocol::handshake::Request as Socks5HandshakeRequest;
 use socks5_impl::protocol::handshake::Response as Socks5HandshakeResponse;
@@ -45,7 +45,7 @@ pub async fn socks5_protocol_proxy(
             let proxy_tcp_connection = match proxy_tcp_connection_pool {
                 None => {
                     let user_info = user_info.read().await;
-                    ProxyTcpConnection::create(
+                    FramedConnection::<ProxyTcpConnectionNewState>::create(
                         username,
                         &user_info,
                         config.proxy_frame_size(),
@@ -56,7 +56,6 @@ pub async fn socks5_protocol_proxy(
                 Some(pool) => pool.take_proxy_connection().await?,
             };
 
-            let proxy_socket_address = proxy_tcp_connection.proxy_socket_address();
             let destination_address = match &init_request.address {
                 Address::SocketAddress(dst_addr) => dst_addr.into(),
                 Address::DomainAddress(host, port) => UnifiedAddress::Domain {
@@ -72,12 +71,10 @@ pub async fn socks5_protocol_proxy(
                 })
                 .await?;
 
-            debug!("Socks5 client tunnel init success with remote: {proxy_socket_address:?}");
             let init_response = Socks5InitResponse::new(Reply::Succeeded, init_request.address);
             init_response
                 .write_to_async_stream(&mut client_tcp_stream)
                 .await?;
-            debug!("Socks5 client tunnel init success begin to relay, : {proxy_socket_address:?}");
 
             // Proxying data
             let (from_client, from_proxy) = match tokio::io::copy_bidirectional_with_sizes(

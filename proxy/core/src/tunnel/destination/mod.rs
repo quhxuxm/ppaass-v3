@@ -1,23 +1,26 @@
 mod tcp;
-mod udp;
 use crate::config::ForwardConfig;
 use ppaass_common::config::ProxyTcpConnectionConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
 use ppaass_common::user::UserInfo;
 use ppaass_common::{
-    ProxyTcpConnection, ProxyTcpConnectionPool, ProxyTcpConnectionRelayState, TunnelInitRequest,
-    UnifiedAddress,
+    CryptoLengthDelimitedFramed, FramedConnection, ProxyTcpConnectionNewState,
+    ProxyTcpConnectionPool, TunnelInitRequest, UnifiedAddress,
 };
 use std::sync::Arc;
 pub use tcp::*;
+use tokio::net::TcpStream;
 use tokio::sync::RwLock;
-use tracing::debug;
-pub use udp::*;
+use tokio_util::bytes::BytesMut;
+use tokio_util::io::{SinkWriter, StreamReader};
 pub enum DestinationEdge {
     Tcp(DestinationTcpEndpoint),
-    Forward(ProxyTcpConnection<ProxyTcpConnectionRelayState>),
-    Udp(DestinationUdpEndpoint),
+    Forward(
+        FramedConnection<
+            SinkWriter<StreamReader<CryptoLengthDelimitedFramed<TcpStream>, BytesMut>>,
+        >,
+    ),
 }
 
 impl DestinationEdge {
@@ -44,7 +47,7 @@ impl DestinationEdge {
             match server_state.get_value::<Arc<ProxyTcpConnectionPool<ForwardConfig>>>() {
                 None => {
                     let user_info = user_info.read().await;
-                    ProxyTcpConnection::create(
+                    FramedConnection::<ProxyTcpConnectionNewState>::create(
                         &username,
                         &user_info,
                         forward_config.proxy_frame_size(),
@@ -54,21 +57,14 @@ impl DestinationEdge {
                 }
                 Some(pool) => pool.take_proxy_connection().await?,
             };
-        let proxy_socket_address = proxy_tcp_connection_pool.proxy_socket_address();
-        debug!("Success to create forward proxy tcp connection: {proxy_socket_address}");
+
         let proxy_tcp_connection = proxy_tcp_connection_pool
             .tunnel_init(TunnelInitRequest::Tcp {
                 destination_address: destination_address.clone(),
                 keep_alive: false,
             })
             .await?;
-        debug!(
-            "Success to send init tunnel request on forward proxy tcp connection: {proxy_socket_address}, destination address: {destination_address:?}"
-        );
-        Ok(Self::Forward(proxy_tcp_connection))
-    }
 
-    pub async fn start_udp() -> Result<Self, CommonError> {
-        Ok(Self::Udp(DestinationUdpEndpoint::new()))
+        Ok(Self::Forward(proxy_tcp_connection))
     }
 }

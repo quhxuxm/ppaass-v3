@@ -1,23 +1,21 @@
+use crate::config::{ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig};
 use crate::error::CommonError;
 use crate::user::UserInfo;
-use crate::{ProxyTcpConnection, ProxyTcpConnectionTunnelCtlState};
+use crate::{FramedConnection, ProxyTcpConnectionNewState, ProxyTcpConnectionTunnelCtlState};
 use chrono::{DateTime, Utc};
 use std::cmp::Ordering;
 use std::fmt::Debug;
-
-use crate::config::{ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc::channel;
 use tokio::sync::{Mutex, RwLock};
 use tokio::time::sleep;
 use tracing::{debug, error};
-#[derive(Debug)]
 struct ProxyTcpConnectionPoolElement<C>
 where
     C: ProxyTcpConnectionPoolConfig + ProxyTcpConnectionConfig + Debug + Send + Sync + 'static,
 {
-    proxy_tcp_connection: ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>,
+    proxy_tcp_connection: FramedConnection<ProxyTcpConnectionTunnelCtlState>,
     create_time: DateTime<Utc>,
     last_check_time: DateTime<Utc>,
     last_check_duration: i64,
@@ -28,7 +26,7 @@ where
     C: ProxyTcpConnectionPoolConfig + ProxyTcpConnectionConfig + Debug + Send + Sync + 'static,
 {
     pub fn new(
-        proxy_tcp_connection: ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>,
+        proxy_tcp_connection: FramedConnection<ProxyTcpConnectionTunnelCtlState>,
         config: Arc<C>,
     ) -> Self {
         Self {
@@ -100,7 +98,7 @@ where
     }
     pub async fn take_proxy_connection(
         &self,
-    ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
+    ) -> Result<FramedConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
         Self::concrete_take_proxy_connection(
             self.pool.clone(),
             self.config.clone(),
@@ -114,7 +112,6 @@ where
         proxy_tcp_connection_pool_element: &mut ProxyTcpConnectionPoolElement<C>,
         config: &C,
     ) -> Result<(), CommonError> {
-        debug!("Checking proxy connection : {proxy_tcp_connection_pool_element:?}");
         let check_duration = proxy_tcp_connection_pool_element
             .proxy_tcp_connection
             .heartbeat(config.heartbeat_timeout())
@@ -151,9 +148,6 @@ where
                         continue 'for_each_connection;
                     }
                     if proxy_tcp_connection_pool_element.need_close() {
-                        debug!(
-                            "Close proxy connection because of it exceed max life time: {proxy_tcp_connection_pool_element:?}"
-                        );
                         continue 'for_each_connection;
                     }
                     let checking_tx = checking_tx.clone();
@@ -204,7 +198,7 @@ where
         config: Arc<C>,
         user_info: Arc<RwLock<UserInfo>>,
         username: &str,
-    ) -> Result<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
+    ) -> Result<FramedConnection<ProxyTcpConnectionTunnelCtlState>, CommonError> {
         loop {
             let mut pool_lock = pool.lock().await;
             debug!(
@@ -252,7 +246,7 @@ where
             pool_lock.len()
         );
         let (proxy_tcp_connection_tx, mut proxy_tcp_connection_rx) =
-            channel::<ProxyTcpConnection<ProxyTcpConnectionTunnelCtlState>>(max_pool_size);
+            channel::<FramedConnection<ProxyTcpConnectionTunnelCtlState>>(max_pool_size);
 
         for _ in pool_lock.len()..max_pool_size {
             let proxy_tcp_connection_tx = proxy_tcp_connection_tx.clone();
@@ -262,7 +256,7 @@ where
             let username = username.to_owned();
             tokio::spawn(async move {
                 let user_info = user_info.read().await;
-                match ProxyTcpConnection::create(
+                match FramedConnection::<ProxyTcpConnectionNewState>::create(
                     &username,
                     &user_info,
                     config.proxy_frame_size(),

@@ -62,8 +62,6 @@ pub enum TunnelInitRequest {
         /// If the destination should keep alive
         keep_alive: bool,
     },
-    /// The udp destination
-    Udp,
 }
 
 /// The failure reason for destination init

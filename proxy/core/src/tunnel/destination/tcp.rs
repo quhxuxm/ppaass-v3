@@ -1,6 +1,5 @@
 use futures_util::{Sink, SinkExt, Stream, StreamExt};
 use ppaass_common::error::CommonError;
-
 use ppaass_common::UnifiedAddress;
 use std::net::SocketAddr;
 use std::pin::Pin;
@@ -11,10 +10,8 @@ use tokio::time::timeout;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{BytesCodec, Framed};
 use tracing::debug;
-
 pub struct DestinationTcpEndpoint {
     destination_tcp_framed: Framed<TcpStream, BytesCodec>,
-    destination_address: UnifiedAddress,
 }
 
 impl DestinationTcpEndpoint {
@@ -38,12 +35,7 @@ impl DestinationTcpEndpoint {
         debug!("Connected to destination success: {}", destination_address);
         Ok(DestinationTcpEndpoint {
             destination_tcp_framed: Framed::new(destination_tcp_stream, BytesCodec::new()),
-            destination_address,
         })
-    }
-
-    pub fn destination_address(&self) -> &UnifiedAddress {
-        &self.destination_address
     }
 }
 

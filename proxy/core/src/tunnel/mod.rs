@@ -1,30 +1,25 @@
-use crate::tunnel::destination::DestinationEdge;
-
-use futures_util::StreamExt;
-use ppaass_common::error::CommonError;
-
 use crate::config::ProxyConfig;
+use crate::tunnel::destination::DestinationEdge;
+use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
 use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
 use ppaass_common::{
-    AgentTcpConnection, AgentTcpConnectionTunnelCtlState, TunnelInitFailureReason,
-    TunnelInitRequest, TunnelInitResponse, UdpRelayDataRequest,
+    AgentTcpConnectionNewState, AgentTcpConnectionTunnelCtlState, FramedConnection,
+    TunnelInitFailureReason, TunnelInitRequest, TunnelInitResponse,
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio::{
     io::{copy_bidirectional, copy_bidirectional_with_sizes},
     net::TcpStream,
 };
-
 use tokio_util::io::{SinkWriter, StreamReader};
 use tracing::debug;
 mod destination;
 
 pub struct Tunnel {
     config: Arc<ProxyConfig>,
-    agent_tcp_connection: AgentTcpConnection<AgentTcpConnectionTunnelCtlState<TcpStream>>,
+    agent_tcp_connection: FramedConnection<AgentTcpConnectionTunnelCtlState>,
     agent_socket_address: SocketAddr,
     server_state: Arc<ServerState>,
 }
@@ -41,7 +36,7 @@ impl Tunnel {
             .ok_or(CommonError::Other(format!(
                 "Fail to get user crypto repository for agent: {agent_socket_address}"
             )))?;
-        let agent_tcp_connection = AgentTcpConnection::create(
+        let agent_tcp_connection = FramedConnection::<AgentTcpConnectionNewState>::create(
             agent_tcp_stream,
             agent_socket_address,
             user_repo.as_ref(),
@@ -92,12 +87,6 @@ impl Tunnel {
                     Ok(destination_edge)
                 }
             },
-            TunnelInitRequest::Udp => {
-                debug!(
-                    "[START UDP] Begin to initialize tunnel for agent: {agent_socket_address:?}"
-                );
-                Ok(DestinationEdge::start_udp().await?)
-            }
         }
     }
 
@@ -125,14 +114,10 @@ impl Tunnel {
                         .agent_tcp_connection
                         .response_tcp_tunnel_init(TunnelInitResponse::Success)
                         .await?;
-                    let agent_socket_address = agent_tcp_connection.agent_socket_address();
-                    let destination_address =
-                        destination_tcp_endpoint.destination_address().clone();
+
                     let destination_tcp_endpoint = StreamReader::new(destination_tcp_endpoint);
                     let mut destination_tcp_connection = SinkWriter::new(destination_tcp_endpoint);
-                    debug!(
-                        "[PROXYING] Going to copy bidirectional between agent [{agent_socket_address}] and destination [{destination_address}]"
-                    );
+
                     let (agent_data_size, destination_data_size) = copy_bidirectional_with_sizes(
                         &mut agent_tcp_connection,
                         &mut destination_tcp_connection,
@@ -150,11 +135,7 @@ impl Tunnel {
                         .agent_tcp_connection
                         .response_tcp_tunnel_init(TunnelInitResponse::Success)
                         .await?;
-                    let agent_socket_address = agent_tcp_connection.agent_socket_address();
-                    let proxy_socket_address = forward_proxy_tcp_connection.proxy_socket_address();
-                    debug!(
-                        "[FORWARDING] Going to copy bidirectional between agent [{agent_socket_address}] and proxy [{proxy_socket_address}]"
-                    );
+
                     let (agent_data_size, proxy_data_size) = copy_bidirectional(
                         &mut agent_tcp_connection,
                         &mut forward_proxy_tcp_connection,
@@ -164,39 +145,6 @@ impl Tunnel {
                         "[FORWARDING] Copy data between agent and proxy, agent data size: {agent_data_size}, proxy data size: {proxy_data_size}"
                     );
                     Ok(())
-                }
-                DestinationEdge::Udp(destination_udp_endpoint) => {
-                    let agent_tcp_connection = self
-                        .agent_tcp_connection
-                        .response_udp_tunnel_init(TunnelInitResponse::Success)
-                        .await?;
-                    let agent_tcp_connection = Arc::new(Mutex::new(agent_tcp_connection));
-                    loop {
-                        let agent_tcp_connection = agent_tcp_connection.clone();
-                        let (
-                            UdpRelayDataRequest {
-                                destination_address,
-                                source_address,
-                                payload,
-                            },
-                            _,
-                        ) = match agent_tcp_connection.lock().await.next().await {
-                            None => return Ok(()),
-                            Some(Err(e)) => return Err(e),
-                            Some(Ok(agent_data)) => bincode::serde::decode_from_slice(
-                                &agent_data,
-                                bincode::config::standard(),
-                            )?,
-                        };
-                        destination_udp_endpoint
-                            .replay(
-                                agent_tcp_connection,
-                                &payload,
-                                source_address,
-                                destination_address,
-                            )
-                            .await?;
-                    }
                 }
             },
         }

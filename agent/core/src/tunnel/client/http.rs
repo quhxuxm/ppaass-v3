@@ -7,15 +7,14 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response};
 use hyper_util::rt::TokioIo;
-use ppaass_common::error::CommonError;
-use ppaass_common::{
-    ProxyTcpConnection, ProxyTcpConnectionPool, TunnelInitRequest, UnifiedAddress,
-};
-
-use ppaass_common::server::ServerState;
-
 use ppaass_common::config::ProxyTcpConnectionConfig;
+use ppaass_common::error::CommonError;
+use ppaass_common::server::ServerState;
 use ppaass_common::user::UserInfo;
+use ppaass_common::{
+    FramedConnection, ProxyTcpConnectionNewState, ProxyTcpConnectionPool, TunnelInitRequest,
+    UnifiedAddress,
+};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -59,7 +58,7 @@ async fn client_http_request_handler(
         server_state.get_value::<Arc<ProxyTcpConnectionPool<AgentConfig>>>();
     let proxy_tcp_connection = match proxy_tcp_connection_pool {
         None => {
-            ProxyTcpConnection::create(
+            FramedConnection::<ProxyTcpConnectionNewState>::create(
                 username,
                 user_info,
                 config.proxy_frame_size(),
@@ -69,8 +68,7 @@ async fn client_http_request_handler(
         }
         Some(pool) => pool.take_proxy_connection().await?,
     };
-    let proxy_socket_address = proxy_tcp_connection.proxy_socket_address();
-    debug!("Going to initialize tunnel with proxy: {proxy_socket_address}");
+
     let mut proxy_tcp_connection = proxy_tcp_connection
         .tunnel_init(TunnelInitRequest::Tcp {
             destination_address,
