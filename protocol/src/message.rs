@@ -54,14 +54,11 @@ pub enum TunnelControlResponse {
 
 /// The tcp destination initialize message used to initialize the destination
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub enum TunnelInitRequest {
-    /// The tcp destination
-    Tcp {
-        /// The destination that the destination is going to connect
-        destination_address: UnifiedAddress,
-        /// If the destination should keep alive
-        keep_alive: bool,
-    },
+pub struct TunnelInitRequest {
+    /// The destination that the destination is going to connect
+    pub destination_address: UnifiedAddress,
+    /// If the destination should keep alive
+    pub keep_alive: bool,
 }
 
 /// The failure reason for destination init
@@ -112,20 +109,4 @@ impl HeartbeatResponse {
     pub fn response_date_time(&self) -> &DateTime<Utc> {
         &self.response_date_time
     }
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct UdpRelayDataRequest {
-    pub destination_address: UnifiedAddress,
-    pub source_address: UnifiedAddress,
-    #[serde(with = "crate::hex")]
-    pub payload: Bytes,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct UdpRelayDataResponse {
-    pub destination_address: UnifiedAddress,
-    pub source_address: UnifiedAddress,
-    #[serde(with = "crate::hex")]
-    pub payload: Bytes,
 }

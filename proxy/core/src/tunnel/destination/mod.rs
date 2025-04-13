@@ -15,7 +15,7 @@ use tokio::sync::RwLock;
 use tokio_util::bytes::BytesMut;
 use tokio_util::io::{SinkWriter, StreamReader};
 pub enum DestinationEdge {
-    Tcp(DestinationTcpEndpoint),
+    Direct(DestinationTcpEndpoint),
     Forward(
         FramedConnection<
             SinkWriter<StreamReader<CryptoLengthDelimitedFramed<TcpStream>, BytesMut>>,
@@ -24,7 +24,7 @@ pub enum DestinationEdge {
 }
 
 impl DestinationEdge {
-    pub async fn start_tcp(
+    pub async fn start_direct(
         destination_address: UnifiedAddress,
         keep_alive: bool,
         connect_timeout: u64,
@@ -32,7 +32,7 @@ impl DestinationEdge {
         let destination_tcp_connection =
             DestinationTcpEndpoint::connect(destination_address, keep_alive, connect_timeout)
                 .await?;
-        Ok(Self::Tcp(destination_tcp_connection))
+        Ok(Self::Direct(destination_tcp_connection))
     }
 
     pub async fn start_forward(
@@ -59,7 +59,7 @@ impl DestinationEdge {
             };
 
         let proxy_tcp_connection = proxy_tcp_connection_pool
-            .tunnel_init(TunnelInitRequest::Tcp {
+            .tunnel_init(TunnelInitRequest {
                 destination_address: destination_address.clone(),
                 keep_alive: false,
             })

@@ -57,36 +57,35 @@ impl Tunnel {
         config: &ProxyConfig,
         server_state: &ServerState,
     ) -> Result<DestinationEdge, CommonError> {
-        match tunnel_init_request {
-            TunnelInitRequest::Tcp {
-                destination_address,
-                keep_alive,
-            } => match config.forward() {
-                None => {
-                    debug!(
-                        "[START TCP] Begin to initialize tunnel for agent: {agent_socket_address:?}"
-                    );
-                    let destination_edge = DestinationEdge::start_tcp(
-                        destination_address,
-                        keep_alive,
-                        config.destination_connect_timeout(),
-                    )
-                    .await?;
-                    Ok(destination_edge)
-                }
-                Some(forward_config) => {
-                    debug!(
-                        "[START FORWARD] Begin to initialize tunnel for agent: {agent_socket_address:?}"
-                    );
-                    let destination_edge = DestinationEdge::start_forward(
-                        server_state,
-                        forward_config,
-                        destination_address,
-                    )
-                    .await?;
-                    Ok(destination_edge)
-                }
-            },
+        let TunnelInitRequest {
+            destination_address,
+            keep_alive,
+        } = tunnel_init_request;
+        match config.forward() {
+            None => {
+                debug!(
+                    "[START TCP] Begin to initialize tunnel for agent: {agent_socket_address:?}"
+                );
+                let destination_edge = DestinationEdge::start_direct(
+                    destination_address,
+                    keep_alive,
+                    config.destination_connect_timeout(),
+                )
+                .await?;
+                Ok(destination_edge)
+            }
+            Some(forward_config) => {
+                debug!(
+                    "[START FORWARD] Begin to initialize tunnel for agent: {agent_socket_address:?}"
+                );
+                let destination_edge = DestinationEdge::start_forward(
+                    server_state,
+                    forward_config,
+                    destination_address,
+                )
+                .await?;
+                Ok(destination_edge)
+            }
         }
     }
 
@@ -102,17 +101,17 @@ impl Tunnel {
         {
             Err(e) => {
                 self.agent_tcp_connection
-                    .response_tcp_tunnel_init(TunnelInitResponse::Failure(
+                    .response_tunnel_init(TunnelInitResponse::Failure(
                         TunnelInitFailureReason::InitWithDestinationFail,
                     ))
                     .await?;
                 Err(e)
             }
             Ok(destination_edge) => match destination_edge {
-                DestinationEdge::Tcp(destination_tcp_endpoint) => {
+                DestinationEdge::Direct(destination_tcp_endpoint) => {
                     let mut agent_tcp_connection = self
                         .agent_tcp_connection
-                        .response_tcp_tunnel_init(TunnelInitResponse::Success)
+                        .response_tunnel_init(TunnelInitResponse::Success)
                         .await?;
 
                     let destination_tcp_endpoint = StreamReader::new(destination_tcp_endpoint);
@@ -133,7 +132,7 @@ impl Tunnel {
                 DestinationEdge::Forward(mut forward_proxy_tcp_connection) => {
                     let mut agent_tcp_connection = self
                         .agent_tcp_connection
-                        .response_tcp_tunnel_init(TunnelInitResponse::Success)
+                        .response_tunnel_init(TunnelInitResponse::Success)
                         .await?;
 
                     let (agent_data_size, proxy_data_size) = copy_bidirectional(

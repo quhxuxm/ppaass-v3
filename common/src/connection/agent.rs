@@ -127,7 +127,7 @@ impl FramedConnection<AgentTcpConnectionTunnelCtlState> {
         }
     }
 
-    pub async fn response_tcp_tunnel_init(
+    pub async fn response_tunnel_init(
         mut self,
         tunnel_init_response: TunnelInitResponse,
     ) -> Result<

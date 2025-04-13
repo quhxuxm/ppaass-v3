@@ -17,8 +17,9 @@ use ppaass_common::{
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::io::copy_bidirectional;
+use tokio::net::TcpStream;
 use tokio::sync::RwLock;
-use tokio_tfo::TfoStream;
 use tower::ServiceBuilder;
 use tracing::{debug, error, info};
 fn success_empty_body() -> BoxBody<Bytes, hyper::Error> {
@@ -70,7 +71,7 @@ async fn client_http_request_handler(
     };
 
     let mut proxy_tcp_connection = proxy_tcp_connection
-        .tunnel_init(TunnelInitRequest::Tcp {
+        .tunnel_init(TunnelInitRequest {
             destination_address,
             keep_alive: false,
         })
@@ -90,8 +91,7 @@ async fn client_http_request_handler(
         // Note: only after client received an empty body with STATUS_OK can the
         // connection be upgraded, so we can't return a response inside
         // `on_upgrade` future.
-        let agent_to_proxy_data_relay_buffer_size = config.agent_to_proxy_data_relay_buffer_size();
-        let proxy_to_agent_data_relay_buffer_size = config.proxy_to_agent_data_relay_buffer_size();
+
         tokio::task::spawn(async move {
             match hyper::upgrade::on(client_http_request).await {
                 Err(e) => {
@@ -102,11 +102,9 @@ async fn client_http_request_handler(
                     // Connect to remote server
                     let mut upgraded_client_io = TokioIo::new(upgraded_client_io);
                     // Proxying data
-                    let (from_client, from_proxy) = match tokio::io::copy_bidirectional_with_sizes(
+                    let (from_client, from_proxy) = match copy_bidirectional(
                         &mut upgraded_client_io,
                         &mut proxy_tcp_connection,
-                        agent_to_proxy_data_relay_buffer_size,
-                        proxy_to_agent_data_relay_buffer_size,
                     )
                     .await
                     {
@@ -147,7 +145,7 @@ async fn client_http_request_handler(
 }
 
 pub async fn http_protocol_proxy(
-    client_tcp_stream: TfoStream,
+    client_tcp_stream: TcpStream,
     client_socket_addr: SocketAddr,
     config: &AgentConfig,
     username: &str,

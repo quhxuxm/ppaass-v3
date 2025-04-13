@@ -15,11 +15,12 @@ use socks5_impl::protocol::{
 };
 use std::net::SocketAddr;
 use std::sync::Arc;
+use tokio::io::copy_bidirectional;
+use tokio::net::TcpStream;
 use tokio::sync::RwLock;
-use tokio_tfo::TfoStream;
 use tracing::{debug, error, info};
 pub async fn socks5_protocol_proxy(
-    mut client_tcp_stream: TfoStream,
+    mut client_tcp_stream: TcpStream,
     client_socket_addr: SocketAddr,
     config: &AgentConfig,
     username: &str,
@@ -65,7 +66,7 @@ pub async fn socks5_protocol_proxy(
             };
 
             let mut proxy_tcp_connection = proxy_tcp_connection
-                .tunnel_init(TunnelInitRequest::Tcp {
+                .tunnel_init(TunnelInitRequest {
                     destination_address,
                     keep_alive: false,
                 })
@@ -77,20 +78,14 @@ pub async fn socks5_protocol_proxy(
                 .await?;
 
             // Proxying data
-            let (from_client, from_proxy) = match tokio::io::copy_bidirectional_with_sizes(
-                &mut client_tcp_stream,
-                &mut proxy_tcp_connection,
-                config.agent_to_proxy_data_relay_buffer_size(),
-                config.proxy_to_agent_data_relay_buffer_size(),
-            )
-            .await
-            {
-                Err(e) => {
-                    error!("Fail to proxy data between agent and proxy: {e:?}");
-                    return Ok(());
-                }
-                Ok((from_client, from_proxy)) => (from_client, from_proxy),
-            };
+            let (from_client, from_proxy) =
+                match copy_bidirectional(&mut client_tcp_stream, &mut proxy_tcp_connection).await {
+                    Err(e) => {
+                        error!("Fail to proxy data between agent and proxy: {e:?}");
+                        return Ok(());
+                    }
+                    Ok((from_client, from_proxy)) => (from_client, from_proxy),
+                };
             info!(
                 "Agent wrote {} bytes to proxy, received {} bytes from proxy",
                 from_client, from_proxy

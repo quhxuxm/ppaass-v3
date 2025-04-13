@@ -19,4 +19,4 @@ bincode = { workspace = true }
 http-body-util = { workspace = true }
 tower = { workspace = true }
 socks5-impl = { workspace = true, features = ["tokio"] }
-tokio-tfo = { workspace = true }
+

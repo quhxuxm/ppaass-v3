@@ -1,5 +1,4 @@
 mod client;
-
 use crate::config::AgentConfig;
 pub use client::*;
 use ppaass_common::error::CommonError;
@@ -8,7 +7,6 @@ use ppaass_common::user::UserInfo;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::{net::TcpStream, sync::RwLock};
-use tokio_tfo::TfoStream;
 use tracing::{debug, error};
 const SOCKS5_VERSION: u8 = 0x05;
 const SOCKS4_VERSION: u8 = 0x04;
@@ -35,7 +33,7 @@ pub async fn handle_client_connection(
         SOCKS5_VERSION => {
             debug!("Client tcp stream using socks5 protocol: {client_socket_addr}");
             socks5_protocol_proxy(
-                TfoStream::from(client_tcp_stream),
+                client_tcp_stream,
                 client_socket_addr,
                 &config,
                 &username,
@@ -53,7 +51,7 @@ pub async fn handle_client_connection(
         _ => {
             debug!("Client tcp stream using http protocol: {client_socket_addr}");
             http_protocol_proxy(
-                TfoStream::from(client_tcp_stream),
+                client_tcp_stream,
                 client_socket_addr,
                 &config,
                 &username,
