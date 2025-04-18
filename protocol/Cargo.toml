@@ -2,6 +2,8 @@
 name = "ppaass-v3-protocol"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "The ppaass v3 protocol"
 
 [dependencies]
 serde = { workspace = true, features = ["derive"] }
