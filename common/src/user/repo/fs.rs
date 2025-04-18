@@ -10,7 +10,6 @@ use std::fs::{read_dir, File};
 use std::future::Future;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
@@ -103,29 +102,29 @@ impl FileSystemUserInfoRepository {
         {
             let user_info_storage = user_info_storage.clone();
             let user_repo_dir_path = user_repo_dir_path.to_owned();
-            let init_signal = Arc::new(AtomicBool::new(false));
+            if let Err(e) = Self::fill_repo_storage(
+                prepare_additional_info.clone(),
+                user_info_storage.clone(),
+                &user_repo_dir_path,
+            )
+            .await
             {
-                let init_signal = init_signal.clone();
-                tokio::spawn(async move {
-                    loop {
-                        if let Err(e) = Self::fill_repo_storage(
-                            prepare_additional_info.clone(),
-                            user_info_storage.clone(),
-                            &user_repo_dir_path,
-                        )
-                        .await
-                        {
-                            error!("Fail to build user repo:{e:?}");
-                        } else {
-                            init_signal.swap(true, Ordering::Relaxed);
-                        }
-                        sleep(Duration::from_secs(refresh_interval)).await;
+                error!("Fail to build user repo:{e:?}");
+            }
+            tokio::spawn(async move {
+                loop {
+                    if let Err(e) = Self::fill_repo_storage(
+                        prepare_additional_info.clone(),
+                        user_info_storage.clone(),
+                        &user_repo_dir_path,
+                    )
+                    .await
+                    {
+                        error!("Fail to build user repo:{e:?}");
                     }
-                });
-            }
-            while !init_signal.load(Ordering::Relaxed) {
-                sleep(Duration::from_millis(500)).await;
-            }
+                    sleep(Duration::from_secs(refresh_interval)).await;
+                }
+            });
         }
 
         Ok(Self { user_info_storage })
