@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ppaass-common = { path = "../../common", package = "common" }
+ppaass-common = { version = "0.1.0", package = "ppaass-v3-common" }
 tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 thiserror = { workspace = true }

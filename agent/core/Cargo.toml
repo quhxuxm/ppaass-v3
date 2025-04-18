@@ -7,7 +7,7 @@ edition = "2024"
 path = "src/lib.rs"
 
 [dependencies]
-ppaass-common = { path = "../../common", package = "common" }
+ppaass-common = { version = "0.1.0", package = "ppaass-v3-common" }
 hyper = { workspace = true, features = ["full"] }
 hyper-util = { workspace = true, features = ["full"] }
 tokio = { workspace = true, features = ["full"] }
