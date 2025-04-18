@@ -11,9 +11,9 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 
 use ppaass_common::error::CommonError;
 use ppaass_common::user::UserInfoRepository;
+use ppaass_common::user::repo::create_fs_user_repository;
 use ppaass_common::user::repo::fs::{
-    FileSystemUserInfoRepository, FsAgentUserInfoContent, FsProxyUserInfoContent,
-    USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME, USER_INFO_ADDITION_INFO_PROXY_SERVERS,
+    FileSystemUserInfoRepository, FsProxyUserInfoContent, USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -64,16 +64,9 @@ async fn start_server(
     if let Some(forward_config) = config.forward() {
         let forward_config = Arc::new(forward_config.clone());
         let forward_fs_user_repo = ForwardProxyUserRepository::new(
-            FileSystemUserInfoRepository::new::<FsAgentUserInfoContent, _, _>(
+            create_fs_user_repository(
+                config.user_dir(),
                 config.user_info_repository_refresh_interval(),
-                forward_config.user_dir(),
-                |user_info, content| async move {
-                    let mut user_info = user_info.write().await;
-                    user_info.add_additional_info(
-                        USER_INFO_ADDITION_INFO_PROXY_SERVERS,
-                        content.proxy_servers().to_owned(),
-                    );
-                },
             )
             .await?,
         );

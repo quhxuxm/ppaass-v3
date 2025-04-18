@@ -4,9 +4,7 @@ use ppaass_agent_core::AgentConfig;
 use ppaass_agent_core::start_server;
 use ppaass_common::config::ServerConfig;
 use ppaass_common::init_logger;
-use ppaass_common::user::repo::fs::{
-    FileSystemUserInfoRepository, FsAgentUserInfoContent, USER_INFO_ADDITION_INFO_PROXY_SERVERS,
-};
+use ppaass_common::user::repo::create_fs_user_repository;
 use std::error::Error as StdError;
 use std::fs::read_to_string;
 use std::path::PathBuf;
@@ -33,16 +31,9 @@ fn main() -> Result<(), Box<dyn StdError>> {
         .worker_threads(config.worker_thread_number())
         .build()?;
     runtime.block_on(async move {
-        let fs_user_repo = match FileSystemUserInfoRepository::new::<FsAgentUserInfoContent, _, _>(
-            config.user_info_repository_refresh_interval(),
+        let fs_user_repo = match create_fs_user_repository(
             config.user_dir(),
-            |user_info, content| async move {
-                let mut user_info = user_info.write().await;
-                user_info.add_additional_info(
-                    USER_INFO_ADDITION_INFO_PROXY_SERVERS,
-                    content.proxy_servers().to_owned(),
-                );
-            },
+            config.user_info_repository_refresh_interval(),
         )
         .await
         {
