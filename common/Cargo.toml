@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-ppaass-protocol = { package = "ppaass-v3-protocol", path = "../protocol" }
+ppaass-protocol = { package = "ppaass-v3-protocol", version = "0.1.0" }
 uuid = { workspace = true, features = ["v4"] }
 rand = { workspace = true }
 rand_core = { workspace = true }
