@@ -3,7 +3,6 @@ use ppaass_common::config::{
     DefaultConnectionPoolConfig, ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig,
     ServerConfig,
 };
-
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Accessors, Debug)]
@@ -56,8 +55,8 @@ pub struct ForwardConfig {
     proxy_frame_buffer_size: usize,
     #[access(get)]
     connection_pool: Option<DefaultConnectionPoolConfig>,
-    #[access(get)]
-    username: Option<String>,
+    #[access(get(ty=&str))]
+    username: String,
 }
 
 impl ProxyTcpConnectionConfig for ForwardConfig {

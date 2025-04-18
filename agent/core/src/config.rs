@@ -3,17 +3,15 @@ use ppaass_common::config::{
     DefaultConnectionPoolConfig, ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig,
     ServerConfig,
 };
-
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-
 #[derive(Serialize, Deserialize, Debug, Accessors)]
 pub struct AgentConfig {
     ip_v6: bool,
     server_port: u16,
     worker_thread_number: usize,
-    #[access(get)]
-    username: Option<String>,
+    #[access(get(ty=&str))]
+    username: String,
     #[access(get)]
     log_dir: PathBuf,
     #[access(get(ty=&str))]

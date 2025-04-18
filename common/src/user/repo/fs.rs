@@ -6,12 +6,12 @@ use chrono::{DateTime, Utc};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs::{File, read_dir};
+use std::fs::{read_dir, File};
 use std::future::Future;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
@@ -253,23 +253,11 @@ impl UserInfoRepository for FileSystemUserInfoRepository {
             Some(user_info) => Ok(Some(user_info.clone())),
         }
     }
-    async fn get_single_user(
-        &self,
-    ) -> Result<Option<(String, Arc<RwLock<UserInfo>>)>, CommonError> {
+    async fn list_all_users(&self) -> Result<Vec<Arc<RwLock<UserInfo>>>, CommonError> {
         let user_info_storage = self.user_info_storage.read().await;
-        let keys = user_info_storage.keys().collect::<Vec<&String>>();
-        let first_key = match keys.first() {
-            None => {
-                return Ok(None);
-            }
-            Some(key) => *key,
-        };
-        let user = match user_info_storage.get(first_key) {
-            None => {
-                return Ok(None);
-            }
-            Some(user) => user,
-        };
-        Ok(Some((first_key.to_string(), user.clone())))
+        Ok(user_info_storage
+            .values()
+            .map(|user_info| user_info.clone())
+            .collect())
     }
 }

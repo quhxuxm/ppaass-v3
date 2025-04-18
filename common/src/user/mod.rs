@@ -39,6 +39,6 @@ impl UserInfo {
 #[async_trait::async_trait]
 pub trait UserInfoRepository {
     async fn get_user(&self, username: &str) -> Result<Option<Arc<RwLock<UserInfo>>>, CommonError>;
-    async fn get_single_user(&self)
-    -> Result<Option<(String, Arc<RwLock<UserInfo>>)>, CommonError>;
+
+    async fn list_all_users(&self) -> Result<Vec<Arc<RwLock<UserInfo>>>, CommonError>;
 }

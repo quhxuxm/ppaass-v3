@@ -18,9 +18,7 @@ impl UserInfoRepository for ForwardProxyUserRepository {
     async fn get_user(&self, username: &str) -> Result<Option<Arc<RwLock<UserInfo>>>, CommonError> {
         self.concrete_user_repo.get_user(username).await
     }
-    async fn get_single_user(
-        &self,
-    ) -> Result<Option<(String, Arc<RwLock<UserInfo>>)>, CommonError> {
-        self.concrete_user_repo.get_single_user().await
+    async fn list_all_users(&self) -> Result<Vec<Arc<RwLock<UserInfo>>>, CommonError> {
+        self.concrete_user_repo.list_all_users().await
     }
 }

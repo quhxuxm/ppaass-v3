@@ -1,22 +1,18 @@
 mod config;
 mod error;
 mod tunnel;
-
 pub use config::AgentConfig;
-use ppaass_common::ProxyTcpConnectionPool;
 use ppaass_common::config::ServerConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::{CommonServer, Server, ServerListener, ServerState};
-use ppaass_common::user::UserInfoRepository;
 use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
+use ppaass_common::user::UserInfoRepository;
+use ppaass_common::ProxyTcpConnectionPool;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
-use std::time::Duration;
 use tokio::net::TcpListener;
-use tokio::time::sleep;
 use tracing::{debug, info};
 pub use tunnel::handle_client_connection;
-
 async fn create_server_listener(config: Arc<AgentConfig>) -> Result<ServerListener, CommonError> {
     if config.ip_v6() {
         debug!(
@@ -50,25 +46,15 @@ pub async fn start_server(
     user_repo: Arc<FileSystemUserInfoRepository>,
 ) -> Result<(), CommonError> {
     let mut server_state = ServerState::new();
-    let (username, user_info) = match config.username() {
-        None => loop {
-            match user_repo.get_single_user().await? {
-                None => {
-                    sleep(Duration::from_millis(500)).await;
-                    continue;
-                }
-                Some(element) => break element,
-            }
-        },
-        Some(username) => {
-            let user_info = user_repo
-                .get_user(username)
-                .await?
-                .ok_or(CommonError::Other(format!(
-                    "Can not get user info from repository: {username}"
-                )))?;
-            (username.to_owned(), user_info)
-        }
+    let (username, user_info) = {
+        let username = config.username();
+        let user_info = user_repo
+            .get_user(username)
+            .await?
+            .ok_or(CommonError::Other(format!(
+                "Can not get user info from repository: {username}"
+            )))?;
+        (username.to_owned(), user_info)
     };
     info!("Start agent server with username: {}", &username);
     server_state.add_value((username.clone(), user_info.clone()));

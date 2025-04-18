@@ -1,24 +1,20 @@
 use clap::Parser;
 use command::Command;
-use ppaass_common::server::{CommonServer, Server, ServerListener, ServerState};
-use ppaass_common::{ProxyTcpConnectionPool, init_logger};
-pub use ppaass_proxy_core::config::*;
-
-use ppaass_proxy_core::tunnel::handle_agent_connection;
-use ppaass_proxy_core::user::ForwardProxyUserRepository;
-use std::fs::read_to_string;
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
-
 use ppaass_common::error::CommonError;
-use ppaass_common::user::UserInfoRepository;
+use ppaass_common::server::{CommonServer, Server, ServerListener, ServerState};
 use ppaass_common::user::repo::create_fs_user_repository;
 use ppaass_common::user::repo::fs::{
     FileSystemUserInfoRepository, FsProxyUserInfoContent, USER_INFO_ADDITION_INFO_EXPIRED_DATE_TIME,
 };
+use ppaass_common::user::UserInfoRepository;
+use ppaass_common::{init_logger, ProxyTcpConnectionPool};
+pub use ppaass_proxy_core::config::*;
+use ppaass_proxy_core::tunnel::handle_agent_connection;
+use ppaass_proxy_core::user::ForwardProxyUserRepository;
+use std::fs::read_to_string;
+use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::Duration;
-use tokio::time::sleep;
 use tokio::{net::TcpListener, runtime::Builder};
 use tracing::{debug, error, trace};
 pub mod command;
@@ -71,31 +67,22 @@ async fn start_server(
             .await?,
         );
         let forward_proxy_user_repo = Arc::new(forward_fs_user_repo);
-        let (forward_username, forward_proxy_user_info) = match forward_config.username() {
-            None => loop {
-                match forward_proxy_user_repo.get_single_user().await? {
-                    None => {
-                        sleep(Duration::from_millis(500)).await;
-                        continue;
-                    }
-                    Some(element) => break element,
-                }
-            },
-            Some(forward_username) => {
-                let user_info = forward_proxy_user_repo
-                    .get_user(forward_username)
+        let (username, forward_proxy_user_info) = {
+            let username = forward_config.username();
+            let user_info =
+                forward_proxy_user_repo
+                    .get_user(username)
                     .await?
                     .ok_or(CommonError::Other(format!(
-                        "Can not get forward user info from repository: {forward_username}"
+                        "Can not get forward user info from repository: {username}"
                     )))?;
-                (forward_username.to_owned(), user_info)
-            }
+            (username, user_info)
         };
-        server_state.add_value((forward_username.clone(), forward_proxy_user_info.clone()));
+        server_state.add_value((username.to_owned(), forward_proxy_user_info.clone()));
         if forward_config.connection_pool().is_some() {
             let proxy_tcp_connection_pool = ProxyTcpConnectionPool::new(
-                forward_config,
-                &forward_username,
+                forward_config.clone(),
+                username,
                 forward_proxy_user_info,
             )
             .await?;
