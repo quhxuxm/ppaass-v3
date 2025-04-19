@@ -52,7 +52,7 @@ sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-cli/resources/* /ppaa
 sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-cli/resources/agent_user/* /ppaass-v3/build/resources/agent_user
 sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-cli/resources/forward_user/* /ppaass-v3/build/resources/forward_user
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-cli/target/release/ppaass-v3-proxy-cli /ppaass-v3/build/ppaass-v3-proxy
-sudo cp /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-tool/target/release/proxy-tool /ppaass-v3/build/ppaass-v3-tool
+sudo cp /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-tool/target/release/proxy-v3-proxy-tool /ppaass-v3/build/ppaass-v3-tool
 sudo cp /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-script/* /ppaass-v3/build/
 
 sudo chmod 777 /ppaass-v3/build
