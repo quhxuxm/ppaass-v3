@@ -31,7 +31,7 @@ pub async fn handle_client_connection(
         .clone();
     match protocol[0] {
         SOCKS5_VERSION => {
-            debug!("Client tcp stream using socks5 protocol: {client_socket_addr}");
+            debug!("Client tcp stream using socks5 ppaass-v3-protocol: {client_socket_addr}");
             socks5_protocol_proxy(
                 client_tcp_stream,
                 client_socket_addr,
@@ -43,13 +43,13 @@ pub async fn handle_client_connection(
             .await
         }
         SOCKS4_VERSION => {
-            debug!("Client tcp stream using socks4 protocol: {client_socket_addr}");
+            debug!("Client tcp stream using socks4 ppaass-v3-protocol: {client_socket_addr}");
             Err(CommonError::Other(
                 "Socks4 proxy is not supported".to_owned(),
             ))
         }
         _ => {
-            debug!("Client tcp stream using http protocol: {client_socket_addr}");
+            debug!("Client tcp stream using http ppaass-v3-protocol: {client_socket_addr}");
             http_protocol_proxy(
                 client_tcp_stream,
                 client_socket_addr,

@@ -27,7 +27,7 @@ pub async fn socks5_protocol_proxy(
     user_info: Arc<RwLock<UserInfo>>,
     server_state: Arc<ServerState>,
 ) -> Result<(), CommonError> {
-    debug!("Client connect to agent with socks 5 protocol: {client_socket_addr}");
+    debug!("Client connect to agent with socks 5 ppaass-v3-protocol: {client_socket_addr}");
     let auth_request =
         Socks5HandshakeRequest::retrieve_from_async_stream(&mut client_tcp_stream).await?;
     debug!("Receive client socks5 handshake auth request: {auth_request:?}");

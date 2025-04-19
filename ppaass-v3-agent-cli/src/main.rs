@@ -1,7 +1,7 @@
 use clap::Parser;
 use command::Command;
-use ppaass_agent_core::AgentConfig;
 use ppaass_agent_core::start_server;
+use ppaass_agent_core::AgentConfig;
 use ppaass_common::config::ServerConfig;
 use ppaass_common::init_logger;
 use ppaass_common::user::repo::create_fs_user_repository;
@@ -15,7 +15,7 @@ pub mod command;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-const DEFAULT_CONFIG_FILE: &str = "resources/config.toml";
+const DEFAULT_CONFIG_FILE: &str = "ppaass-v3-agent-ppaass-v3-proxy-resources/config.toml";
 
 fn main() -> Result<(), Box<dyn StdError>> {
     let command = Command::parse();

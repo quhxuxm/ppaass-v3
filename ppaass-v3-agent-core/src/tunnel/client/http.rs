@@ -86,7 +86,7 @@ async fn client_http_request_handler(
         // ```
         //
         // When HTTP method is CONNECT we should return an empty body
-        // then we can eventually upgrade the connection and talk a new protocol.
+        // then we can eventually upgrade the connection and talk a new ppaass-v3-protocol.
         //
         // Note: only after client received an empty body with STATUS_OK can the
         // connection be upgraded, so we can't return a response inside
