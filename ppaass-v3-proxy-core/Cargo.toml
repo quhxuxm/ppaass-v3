@@ -1,13 +1,13 @@
 [package]
 name = "ppaass-v3-proxy-core"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT"
 description = "The ppaass V3 proxy core library"
 [lib]
 crate-type = ["lib"]
 [dependencies]
-ppaass-common = { version = "0.1.1", package = "ppaass-v3-common" }
+ppaass-common = { version = "0.1.2", package = "ppaass-v3-common" }
 tokio = { version = "1.44.2", features = ["full"] }
 tracing = "0.1.41"
 thiserror = "2.0.12"

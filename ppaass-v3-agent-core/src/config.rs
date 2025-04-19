@@ -7,29 +7,20 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 #[derive(Serialize, Deserialize, Debug, Accessors)]
 pub struct AgentConfig {
-    ip_v6: bool,
-    server_port: u16,
-    worker_thread_number: usize,
-    #[access(get(ty=&str))]
-    username: String,
-    #[access(get)]
-    log_dir: PathBuf,
-    #[access(get(ty=&str))]
-    log_name_prefix: String,
-    #[access(get(ty=&str))]
-    max_log_level: String,
-    #[access(get(ty=&std::path::Path))]
-    user_dir: PathBuf,
-    #[access(get(cp))]
-    agent_to_proxy_data_relay_buffer_size: usize,
-    #[access(get(cp))]
-    proxy_to_agent_data_relay_buffer_size: usize,
-    proxy_frame_buffer_size: usize,
-    proxy_connect_timeout: u64,
-    #[access(get(cp))]
-    user_info_repository_refresh_interval: u64,
-    #[access(get)]
-    connection_pool: Option<DefaultConnectionPoolConfig>,
+    pub ip_v6: bool,
+    pub server_port: u16,
+    pub worker_thread_number: usize,
+    pub username: String,
+    pub log_dir: PathBuf,
+    pub log_name_prefix: String,
+    pub max_log_level: String,
+    pub user_dir: PathBuf,
+    pub agent_to_proxy_data_relay_buffer_size: usize,
+    pub proxy_to_agent_data_relay_buffer_size: usize,
+    pub proxy_frame_buffer_size: usize,
+    pub proxy_connect_timeout: u64,
+    pub user_info_repository_refresh_interval: u64,
+    pub connection_pool: Option<DefaultConnectionPoolConfig>,
 }
 
 impl ProxyTcpConnectionConfig for AgentConfig {

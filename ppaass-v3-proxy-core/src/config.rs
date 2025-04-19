@@ -1,7 +1,7 @@
 use accessory::Accessors;
 use ppaass_common::config::{
-    DefaultConnectionPoolConfig, ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig,
-    ServerConfig,
+    ConnectionPoolConfig, RetrieveConnectionConfig, RetrieveConnectionPoolConfig,
+    RetrieveServerConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -35,7 +35,7 @@ pub struct ProxyConfig {
     user_info_repository_refresh_interval: u64,
 }
 
-impl ServerConfig for ProxyConfig {
+impl RetrieveServerConfig for ProxyConfig {
     fn worker_thread_number(&self) -> usize {
         self.worker_thread_number
     }
@@ -54,21 +54,21 @@ pub struct ForwardConfig {
     user_dir: PathBuf,
     proxy_frame_buffer_size: usize,
     #[access(get)]
-    connection_pool: Option<DefaultConnectionPoolConfig>,
+    connection_pool: Option<ConnectionPoolConfig>,
     #[access(get(ty=&str))]
     username: String,
 }
 
-impl ProxyTcpConnectionConfig for ForwardConfig {
-    fn proxy_frame_size(&self) -> usize {
+impl RetrieveConnectionConfig for ForwardConfig {
+    fn frame_size(&self) -> usize {
         self.proxy_frame_buffer_size
     }
-    fn proxy_connect_timeout(&self) -> u64 {
+    fn connect_timeout(&self) -> u64 {
         self.proxy_connect_timeout
     }
 }
 
-impl ProxyTcpConnectionPoolConfig for ForwardConfig {
+impl RetrieveConnectionPoolConfig for ForwardConfig {
     fn max_pool_size(&self) -> usize {
         match &self.connection_pool {
             None => 0,
