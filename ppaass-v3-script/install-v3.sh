@@ -42,16 +42,18 @@ sudo git clone -b main https://github.com/quhxuxm/ppaass-v3.git ppaass-v3
 sudo chmod 777 ppaass-v3
 cd /ppaass-v3/sourcecode/ppaass-v3
 sudo git pull
-
-cargo build --release --package proxy-cli --package proxy-tool
+cd /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-cli
+cargo build --release
+cd /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-tool
+cargo build --release
 
 # ps -ef | grep gradle | grep -v grep | awk '{print $2}' | xargs kill -9
-sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/* /ppaass-v3/build/resources
-sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/agent_user/* /ppaass-v3/build/resources/agent_user
-sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/proxy/resources/forward_user/* /ppaass-v3/build/resources/forward_user
-sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/proxy-cli /ppaass-v3/build/ppaass-v3-proxy
-sudo cp /ppaass-v3/sourcecode/ppaass-v3/target/release/proxy-tool /ppaass-v3/build/ppaass-v3-tool
-sudo cp /ppaass-v3/sourcecode/ppaass-v3/script/* /ppaass-v3/build/
+sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-cli/resources/* /ppaass-v3/build/resources
+sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-cli/resources/agent_user/* /ppaass-v3/build/resources/agent_user
+sudo cp -r /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-cli/resources/forward_user/* /ppaass-v3/build/resources/forward_user
+sudo cp /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-cli/target/release/proxy-cli /ppaass-v3/build/ppaass-v3-proxy
+sudo cp /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-proxy-tool/target/release/proxy-tool /ppaass-v3/build/ppaass-v3-tool
+sudo cp /ppaass-v3/sourcecode/ppaass-v3/ppaass-v3-script/* /ppaass-v3/build/
 
 sudo chmod 777 /ppaass-v3/build
 cd /ppaass-v3/build
