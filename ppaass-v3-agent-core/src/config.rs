@@ -1,11 +1,10 @@
-use accessory::Accessors;
 use ppaass_common::config::{
     ConnectionPoolConfig, RetrieveConnectionConfig, RetrieveConnectionPoolConfig,
     RetrieveServerConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
-#[derive(Serialize, Deserialize, Debug, Accessors)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct AgentConfig {
     pub ip_v6: bool,
     pub server_port: u16,
