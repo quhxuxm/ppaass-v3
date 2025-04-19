@@ -1,13 +1,14 @@
 [package]
 name = "ppaass-v3-protocol"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT"
 description = "The ppaass v3 protocol"
-
+[lib]
+crate-type = ["lib"]
 [dependencies]
-serde = { workspace = true, features = ["derive"] }
-thiserror = { workspace = true }
-hex = { workspace = true }
-chrono = { workspace = true, features = ["serde"] }
-bytes = { workspace = true, features = ["serde"] }
+serde = { version = "1.0.219", features = ["derive"] }
+thiserror = { version = "2.0.12" }
+hex = { version = "0.4.3" }
+chrono = { version = "0.4.40", features = ["serde"] }
+bytes = { version = "1.10.1", features = ["serde"] }
