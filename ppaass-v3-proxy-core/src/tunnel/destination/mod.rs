@@ -1,6 +1,6 @@
 mod tcp;
 use crate::config::ForwardConfig;
-use ppaass_common::config::ProxyTcpConnectionConfig;
+use ppaass_common::config::RetrieveConnectionConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
 use ppaass_common::user::UserInfo;
@@ -35,9 +35,9 @@ impl DestinationEdge {
         Ok(Self::Direct(destination_tcp_connection))
     }
 
-    pub async fn start_forward(
+    pub async fn start_forward<T: RetrieveConnectionConfig>(
         server_state: &ServerState,
-        forward_config: &ForwardConfig,
+        forward_config: &T,
         destination_address: UnifiedAddress,
     ) -> Result<Self, CommonError> {
         let (username, user_info) = server_state
@@ -50,8 +50,8 @@ impl DestinationEdge {
                     FramedConnection::<ProxyTcpConnectionNewState>::create(
                         &username,
                         &user_info,
-                        forward_config.proxy_frame_size(),
-                        forward_config.proxy_connect_timeout(),
+                        forward_config.frame_size(),
+                        forward_config.connect_timeout(),
                     )
                     .await?
                 }
