@@ -1,33 +1,34 @@
 [package]
 name = "ppaass-v3-common"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "MIT"
 description = "Ppaass v3 common"
-
+[lib]
+crate-type = ["lib"]
 [dependencies]
-ppaass-protocol = { package = "ppaass-v3-protocol", version = "0.1.0" }
-uuid = { workspace = true, features = ["v4"] }
-rand = { workspace = true }
-rand_core = { workspace = true }
-thiserror = { workspace = true }
-aes = { workspace = true }
-blowfish = { workspace = true }
-rsa = { workspace = true, features = ["getrandom"] }
-cipher = { workspace = true, features = ["block-padding", "alloc"] }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true, features = ["chrono"] }
-tracing-appender = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
-bincode = { workspace = true, features = ["serde"] }
-hyper = { workspace = true }
-tokio-util = { workspace = true, features = ["codec", "io", "io-util"] }
-futures-util = { workspace = true, features = ["sink"] }
-async-trait = { workspace = true }
-chrono = { workspace = true, features = ["serde"] }
-serde = { workspace = true }
-bytes = { workspace = true }
-cbc = { workspace = true }
-toml = { workspace = true }
-accessory = { workspace = true }
-zip = { workspace = true }
+ppaass-protocol = { package = "ppaass-v3-protocol", version = "0.1.1" }
+uuid = { version = "1.16.0", features = ["v4"] }
+rand = { version = "0.9.1" }
+rand_core = { version = "0.9.3" }
+thiserror = { version = "2.0.12" }
+aes = { version = "0.8.4" }
+blowfish = { version = "0.9.1" }
+rsa = { version = "0.9.8", features = ["getrandom"] }
+cipher = { version = "0.4.4", features = ["block-padding", "alloc"] }
+tracing = { version = "0.1.41" }
+tracing-subscriber = { version = "0.3.19", features = ["chrono"] }
+tracing-appender = { version = "0.2.3" }
+tokio = { version = "1.44.2", features = ["full"] }
+bincode = { version = "2.0.1", features = ["serde"] }
+hyper = { version = "1.6.0" }
+tokio-util = { version = "0.7.14", features = ["codec", "io", "io-util"] }
+futures-util = { version = "0.3.31", features = ["sink"] }
+async-trait = { version = "0.1.88" }
+chrono = { version = "0.4.40", features = ["serde"] }
+serde = { version = "1.0.219" }
+bytes = { version = "1.10.1" }
+cbc = { version = "0.1.2" }
+toml = { version = "0.8.20" }
+accessory = { version = "2.0.0" }
+zip = { version = "2.6.1" }
