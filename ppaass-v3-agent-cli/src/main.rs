@@ -15,7 +15,7 @@ pub mod command;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-const DEFAULT_CONFIG_FILE: &str = "ppaass-v3-agent-ppaass-v3-proxy-resources/config.toml";
+const DEFAULT_CONFIG_FILE: &str = "ppaass-v3-agent-resources/config.toml";
 
 fn main() -> Result<(), Box<dyn StdError>> {
     let command = Command::parse();

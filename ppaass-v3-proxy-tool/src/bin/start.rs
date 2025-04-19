@@ -6,7 +6,7 @@ use ppaass_v3_proxy_tool::handler::generate_user::{generate_user, GenerateUserHa
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::Arc;
-const DEFAULT_CONFIG_FILE: &str = "ppaass-v3-agent-ppaass-v3-proxy-resources/config.toml";
+const DEFAULT_CONFIG_FILE: &str = "ppaass-v3-agent-resources/config.toml";
 fn main() -> Result<()> {
     let command = ToolCommand::parse();
     let config_file_path = command

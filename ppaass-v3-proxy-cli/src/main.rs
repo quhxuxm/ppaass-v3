@@ -21,7 +21,7 @@ pub mod command;
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
-const DEFAULT_CONFIG_FILE: &str = "ppaass-v3-agent-ppaass-v3-proxy-resources/config.toml";
+const DEFAULT_CONFIG_FILE: &str = "resources/config.toml";
 
 async fn create_server_listener(config: Arc<ProxyConfig>) -> Result<ServerListener, CommonError> {
     if config.ip_v6() {
