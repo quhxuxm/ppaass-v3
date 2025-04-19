@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::Parser;
-use proxy_tool::command::{ToolCommand, ToolSubCommand};
-use proxy_tool::config::ProxyToolConfig;
-use proxy_tool::handler::generate_user::{GenerateUserHandlerArgument, generate_user};
+use ppaass_v3_proxy_tool::command::{ToolCommand, ToolSubCommand};
+use ppaass_v3_proxy_tool::config::ProxyToolConfig;
+use ppaass_v3_proxy_tool::handler::generate_user::{generate_user, GenerateUserHandlerArgument};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::sync::Arc;

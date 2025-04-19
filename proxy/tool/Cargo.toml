@@ -1,5 +1,5 @@
 [package]
-name = "proxy-tool"
+name = "ppaass-v3-proxy-tool"
 version = "0.1.0"
 edition = "2024"
 
@@ -10,11 +10,11 @@ path = "src/bin/start.rs"
 name = "proxy-tool"
 
 [dependencies]
-ppaass-common = { version = "0.1.0", package = "ppaass-v3-common" }
-clap = { workspace = true, features = ["derive"] }
-anyhow = { workspace = true }
-toml = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-accessory = { workspace = true }
-chrono = { workspace = true }
-zip = { workspace = true }
+ppaass-common = { version = "0.1.1", package = "ppaass-v3-common" }
+clap = { version = "4.5.37", features = ["derive"] }
+anyhow = { version = "1.0.98" }
+toml = { version = "0.8.20" }
+serde = { version = "1.0.219", features = ["derive"] }
+accessory = { version = "2.0.0" }
+chrono = { version = "0.4.40" }
+zip = { version = "2.6.1" }
