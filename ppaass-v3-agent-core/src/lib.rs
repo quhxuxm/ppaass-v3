@@ -2,7 +2,7 @@ mod config;
 mod error;
 mod tunnel;
 pub use config::AgentConfig;
-use ppaass_common::config::ServerConfig;
+use ppaass_common::config::RetrieveServerConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::{CommonServer, Server, ServerListener, ServerState};
 use ppaass_common::user::UserInfoRepository;
@@ -12,7 +12,9 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{debug, info};
 use tunnel::handle_client_connection;
-async fn create_server_listener(config: Arc<AgentConfig>) -> Result<ServerListener, CommonError> {
+async fn create_server_listener<T: RetrieveServerConfig>(
+    config: Arc<T>,
+) -> Result<ServerListener, CommonError> {
     if config.ip_v6() {
         debug!(
             "Starting server listener with IPv6 on port: {}",
@@ -40,24 +42,24 @@ async fn create_server_listener(config: Arc<AgentConfig>) -> Result<ServerListen
     }
 }
 
-pub async fn start_server<T: UserInfoRepository + Send + Sync + 'static>(
-    config: Arc<AgentConfig>,
-    user_repo: Arc<T>,
-) -> Result<(), CommonError> {
+pub async fn start_server<T>(config: Arc<AgentConfig>, user_repo: Arc<T>) -> Result<(), CommonError>
+where
+    T: UserInfoRepository + Send + Sync + 'static,
+{
     let mut server_state = ServerState::new();
     let (username, user_info) = {
-        let username = config.username();
+        let username = &config.username;
         let user_info = user_repo
             .get_user(username)
             .await?
             .ok_or(CommonError::Other(format!(
                 "Can not get user info from repository: {username}"
             )))?;
-        (username.to_owned(), user_info)
+        (&config.username.to_owned(), user_info)
     };
     info!("Start agent server with username: {}", &username);
     server_state.add_value((username.clone(), user_info.clone()));
-    if config.connection_pool().is_some() {
+    if config.connection_pool.is_some() {
         let proxy_tcp_connection_pool =
             ProxyTcpConnectionPool::new(config.clone(), &username, user_info.clone()).await?;
         server_state.add_value(Arc::new(proxy_tcp_connection_pool));

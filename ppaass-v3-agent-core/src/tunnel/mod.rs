@@ -1,6 +1,6 @@
 mod client;
-use crate::config::AgentConfig;
 pub use client::*;
+use ppaass_common::config::RetrieveConnectionConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
 use ppaass_common::user::UserInfo;
@@ -11,8 +11,8 @@ use tracing::{debug, error};
 const SOCKS5_VERSION: u8 = 0x05;
 const SOCKS4_VERSION: u8 = 0x04;
 
-pub async fn handle_client_connection(
-    config: Arc<AgentConfig>,
+pub async fn handle_client_connection<T: RetrieveConnectionConfig>(
+    config: Arc<T>,
     server_state: Arc<ServerState>,
     client_tcp_stream: TcpStream,
     client_socket_address: SocketAddr,
@@ -35,7 +35,7 @@ pub async fn handle_client_connection(
             socks5_protocol_proxy(
                 client_tcp_stream,
                 client_socket_addr,
-                &config,
+                config.as_ref(),
                 &username,
                 user_info,
                 server_state,
@@ -53,7 +53,7 @@ pub async fn handle_client_connection(
             http_protocol_proxy(
                 client_tcp_stream,
                 client_socket_addr,
-                &config,
+                config.as_ref(),
                 &username,
                 user_info,
                 server_state,

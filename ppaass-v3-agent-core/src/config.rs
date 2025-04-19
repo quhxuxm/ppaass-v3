@@ -1,7 +1,7 @@
 use accessory::Accessors;
 use ppaass_common::config::{
-    DefaultConnectionPoolConfig, ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig,
-    ServerConfig,
+    ConnectionPoolConfig, RetrieveConnectionConfig, RetrieveConnectionPoolConfig,
+    RetrieveServerConfig,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -20,19 +20,19 @@ pub struct AgentConfig {
     pub proxy_frame_buffer_size: usize,
     pub proxy_connect_timeout: u64,
     pub user_info_repository_refresh_interval: u64,
-    pub connection_pool: Option<DefaultConnectionPoolConfig>,
+    pub connection_pool: Option<ConnectionPoolConfig>,
 }
 
-impl ProxyTcpConnectionConfig for AgentConfig {
-    fn proxy_frame_size(&self) -> usize {
+impl RetrieveConnectionConfig for AgentConfig {
+    fn frame_size(&self) -> usize {
         self.proxy_frame_buffer_size
     }
-    fn proxy_connect_timeout(&self) -> u64 {
+    fn connect_timeout(&self) -> u64 {
         self.proxy_connect_timeout
     }
 }
 
-impl ProxyTcpConnectionPoolConfig for AgentConfig {
+impl RetrieveConnectionPoolConfig for AgentConfig {
     fn max_pool_size(&self) -> usize {
         match self.connection_pool {
             Some(ref pool) => pool.max_pool_size(),
@@ -71,7 +71,7 @@ impl ProxyTcpConnectionPoolConfig for AgentConfig {
     }
 }
 
-impl ServerConfig for AgentConfig {
+impl RetrieveServerConfig for AgentConfig {
     fn worker_thread_number(&self) -> usize {
         self.worker_thread_number
     }

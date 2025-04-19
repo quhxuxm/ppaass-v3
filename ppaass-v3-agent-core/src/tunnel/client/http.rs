@@ -7,7 +7,7 @@ use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Method, Request, Response};
 use hyper_util::rt::TokioIo;
-use ppaass_common::config::ProxyTcpConnectionConfig;
+use ppaass_common::config::RetrieveConnectionConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
 use ppaass_common::user::UserInfo;
@@ -28,8 +28,8 @@ fn success_empty_body() -> BoxBody<Bytes, hyper::Error> {
         .boxed()
 }
 
-async fn client_http_request_handler(
-    config: &AgentConfig,
+async fn client_http_request_handler<T: RetrieveConnectionConfig>(
+    config: &T,
     username: &str,
     user_info: &UserInfo,
     server_state: Arc<ServerState>,
@@ -62,8 +62,8 @@ async fn client_http_request_handler(
             FramedConnection::<ProxyTcpConnectionNewState>::create(
                 username,
                 user_info,
-                config.proxy_frame_size(),
-                config.proxy_connect_timeout(),
+                config.frame_size(),
+                config.connect_timeout(),
             )
             .await?
         }
@@ -144,10 +144,10 @@ async fn client_http_request_handler(
     }
 }
 
-pub async fn http_protocol_proxy(
+pub async fn http_protocol_proxy<T: RetrieveConnectionConfig>(
     client_tcp_stream: TcpStream,
     client_socket_addr: SocketAddr,
-    config: &AgentConfig,
+    config: &T,
     username: &str,
     user_info: Arc<RwLock<UserInfo>>,
     server_state: Arc<ServerState>,

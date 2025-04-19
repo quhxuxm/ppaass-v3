@@ -1,5 +1,5 @@
 use crate::config::AgentConfig;
-use ppaass_common::config::ProxyTcpConnectionConfig;
+use ppaass_common::config::RetrieveConnectionConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::ServerState;
 use ppaass_common::user::UserInfo;
@@ -19,10 +19,10 @@ use tokio::io::copy_bidirectional;
 use tokio::net::TcpStream;
 use tokio::sync::RwLock;
 use tracing::{debug, error, info};
-pub async fn socks5_protocol_proxy(
+pub async fn socks5_protocol_proxy<T: RetrieveConnectionConfig>(
     mut client_tcp_stream: TcpStream,
     client_socket_addr: SocketAddr,
-    config: &AgentConfig,
+    config: &T,
     username: &str,
     user_info: Arc<RwLock<UserInfo>>,
     server_state: Arc<ServerState>,
@@ -49,8 +49,8 @@ pub async fn socks5_protocol_proxy(
                     FramedConnection::<ProxyTcpConnectionNewState>::create(
                         username,
                         &user_info,
-                        config.proxy_frame_size(),
-                        config.proxy_connect_timeout(),
+                        config.frame_size(),
+                        config.connect_timeout(),
                     )
                     .await?
                 }
