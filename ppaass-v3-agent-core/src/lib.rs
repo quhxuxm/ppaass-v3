@@ -40,7 +40,7 @@ async fn create_server_listener(config: Arc<AgentConfig>) -> Result<ServerListen
     }
 }
 
-pub async fn start_server<T: UserInfoRepository + 'static>(
+pub async fn start_server<T: UserInfoRepository + Send + Sync + 'static>(
     config: Arc<AgentConfig>,
     user_repo: Arc<T>,
 ) -> Result<(), CommonError> {

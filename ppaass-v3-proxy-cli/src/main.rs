@@ -51,9 +51,9 @@ async fn create_server_listener(config: Arc<ProxyConfig>) -> Result<ServerListen
     }
 }
 
-async fn start_server(
+async fn start_server<T: UserInfoRepository + Send + Sync + 'static>(
     config: Arc<ProxyConfig>,
-    agent_user_repo: Arc<FileSystemUserInfoRepository>,
+    agent_user_repo: Arc<T>,
 ) -> Result<(), CommonError> {
     let mut server_state = ServerState::new();
     server_state.add_value(agent_user_repo.clone());
