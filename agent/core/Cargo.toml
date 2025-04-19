@@ -1,22 +1,24 @@
 [package]
-name = "agent-core"
+name = "ppaass-v3-agent-core"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "The ppaass v3 agent core library"
 
 [lib]
-path = "src/lib.rs"
+crate-type = ["lib"]
 
 [dependencies]
-ppaass-common = { version = "0.1.0", package = "ppaass-v3-common" }
-hyper = { workspace = true, features = ["full"] }
-hyper-util = { workspace = true, features = ["full"] }
-tokio = { workspace = true, features = ["full"] }
-thiserror = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-accessory = { workspace = true }
-tracing = { workspace = true }
-bincode = { workspace = true }
-http-body-util = { workspace = true }
-tower = { workspace = true }
-socks5-impl = { workspace = true, features = ["tokio"] }
+ppaass-common = { version = "0.1.1", package = "ppaass-v3-common" }
+hyper = { version = "1.6.0", features = ["full"] }
+hyper-util = { version = "0.1.11", features = ["full"] }
+tokio = { version = "1.44.2", features = ["full"] }
+thiserror = { version = "2.0.12" }
+serde = { version = "1.0.219", features = ["derive"] }
+accessory = { version = "2.0.0" }
+tracing = { version = "0.1.41" }
+bincode = { version = "2.0.1" }
+http-body-util = { version = "0.1.3" }
+tower = { version = "0.5.2" }
+socks5-impl = { version = "0.6.2", features = ["tokio"] }
 
