@@ -13,7 +13,7 @@ opt-level = 3
 
 [dependencies]
 ppaass-common = { version = "0.1.1", package = "ppaass-v3-common" }
-ppaass-proxy-core = { version = "0.1.0", package = "ppaass-v3-proxy-core" }
+ppaass-proxy-core = { version = "0.1.1", package = "ppaass-v3-proxy-core" }
 mimalloc = { version = "0.1.46" }
 toml = { version = "0.8.20" }
 clap = { version = "4.5.37", features = ["derive"] }
