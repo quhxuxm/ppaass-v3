@@ -9,7 +9,7 @@ description = "The ppaass v3 proxy tool"
 path = "src/lib.rs"
 [[bin]]
 path = "src/bin/start.rs"
-name = "proxy-tool"
+name = "ppaass-v3-proxy-tool"
 
 [dependencies]
 ppaass-common = { version = "0.1.1", package = "ppaass-v3-common" }
