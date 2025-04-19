@@ -5,7 +5,6 @@ pub use config::AgentConfig;
 use ppaass_common::config::ServerConfig;
 use ppaass_common::error::CommonError;
 use ppaass_common::server::{CommonServer, Server, ServerListener, ServerState};
-use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
 use ppaass_common::user::UserInfoRepository;
 use ppaass_common::ProxyTcpConnectionPool;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
@@ -41,9 +40,9 @@ async fn create_server_listener(config: Arc<AgentConfig>) -> Result<ServerListen
     }
 }
 
-pub async fn start_server(
+pub async fn start_server<T: UserInfoRepository + 'static>(
     config: Arc<AgentConfig>,
-    user_repo: Arc<FileSystemUserInfoRepository>,
+    user_repo: Arc<T>,
 ) -> Result<(), CommonError> {
     let mut server_state = ServerState::new();
     let (username, user_info) = {
