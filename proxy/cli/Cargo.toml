@@ -1,13 +1,21 @@
 [package]
-name = "proxy-cli"
+name = "ppaass-v3-proxy-cli"
 version = "0.1.0"
 edition = "2024"
+resolver = "3"
+license = "MIT"
+description = "The ppaass v3 proxy cli"
+
+[profile.release]
+codegen-units = 1
+lto = "thin"
+opt-level = 3
 
 [dependencies]
-ppaass-common = { version = "0.1.0", package = "ppaass-v3-common" }
-ppaass-proxy-core = { path = "../core", package = "proxy-core" }
-mimalloc = { workspace = true }
-toml = { workspace = true }
-clap = { workspace = true, features = ["derive"] }
-tokio = { workspace = true, features = ["full"] }
-tracing = { workspace = true }
+ppaass-common = { version = "0.1.1", package = "ppaass-v3-common" }
+ppaass-proxy-core = { version = "0.1.0", package = "ppaass-v3-proxy-core" }
+mimalloc = { version = "0.1.46" }
+toml = { version = "0.8.20" }
+clap = { version = "4.5.37", features = ["derive"] }
+tokio = { version = "1.44.2", features = ["full"] }
+tracing = { version = "0.1.41" }
