@@ -11,7 +11,7 @@ use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::{debug, info};
-pub use tunnel::handle_client_connection;
+use tunnel::handle_client_connection;
 async fn create_server_listener(config: Arc<AgentConfig>) -> Result<ServerListener, CommonError> {
     if config.ip_v6() {
         debug!(
