@@ -1,16 +1,16 @@
 [package]
-name = "proxy-core"
+name = "ppaass-v3-proxy-core"
 version = "0.1.0"
 edition = "2024"
-
+[lib]
+crate-type = ["lib"]
 [dependencies]
-ppaass-common = { version = "0.1.0", package = "ppaass-v3-common" }
-tokio = { workspace = true, features = ["full"] }
-tracing = { workspace = true }
-thiserror = { workspace = true }
-accessory = { workspace = true }
-serde = { workspace = true, features = ["derive"] }
-tokio-util = { workspace = true, features = ["codec", "io"] }
-futures-util = { workspace = true, features = ["sink"] }
-bincode = { workspace = true }
-async-trait = { workspace = true }
+ppaass-common = { version = "0.1.1", package = "ppaass-v3-common" }
+tokio = { version = "1.44.2", features = ["full"] }
+tracing = "0.1.41"
+thiserror = "2.0.12"
+accessory = "2.0.0"
+serde = { version = "1.0.219", features = ["default"] }
+tokio-util = { version = "0.7.14", features = ["codec", "io"] }
+futures-util = { version = "0.3.31", features = ["sink"] }
+async-trait = { version = "0.1.88" }
