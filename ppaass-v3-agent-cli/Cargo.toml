@@ -1,13 +1,13 @@
 [package]
 name = "ppaass-v3-agent-cli"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 license = "MIT"
 description = "The ppaass v3 agent cli"
 
 [dependencies]
 ppaass-common = { version = "0.1.1", package = "ppaass-v3-common" }
-ppaass-agent-core = { version = "0.1.3", package = "ppaass-v3-agent-core" }
+ppaass-agent-core = { version = "0.1.4", package = "ppaass-v3-agent-core" }
 mimalloc = { version = "0.1.46" }
 toml = { version = "0.8.20" }
 clap = { version = "4.5.37", features = ["derive"] }

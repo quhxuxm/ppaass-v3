@@ -2,7 +2,6 @@ use clap::Parser;
 use command::Command;
 use ppaass_agent_core::start_server;
 use ppaass_agent_core::AgentConfig;
-use ppaass_common::config::ServerConfig;
 use ppaass_common::init_logger;
 use ppaass_common::user::repo::create_fs_user_repository;
 use std::error::Error as StdError;
@@ -24,16 +23,16 @@ fn main() -> Result<(), Box<dyn StdError>> {
         .unwrap_or_else(|| PathBuf::from(DEFAULT_CONFIG_FILE));
     let config_file_content = read_to_string(config_file_path)?;
     let config = Arc::new(toml::from_str::<AgentConfig>(&config_file_content)?);
-    let log_dir = command.log_dir.unwrap_or(config.log_dir().clone());
-    let _log_guard = init_logger(&log_dir, config.log_name_prefix(), config.max_log_level())?;
+    let log_dir = command.log_dir.unwrap_or(config.log_dir.clone());
+    let _log_guard = init_logger(&log_dir, &config.log_name_prefix, &config.max_log_level)?;
     let runtime = Builder::new_multi_thread()
         .enable_all()
-        .worker_threads(config.worker_thread_number())
+        .worker_threads(config.worker_thread_number)
         .build()?;
     runtime.block_on(async move {
         let fs_user_repo = match create_fs_user_repository(
-            config.user_dir(),
-            config.user_info_repository_refresh_interval(),
+            &config.user_dir,
+            config.user_info_repository_refresh_interval,
         )
         .await
         {
