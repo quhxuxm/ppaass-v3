@@ -7,7 +7,7 @@ description = "The ppaass v3 agent cli"
 
 [dependencies]
 ppaass-common = { version = "0.1.1", package = "ppaass-v3-common" }
-ppaass-agent-core = { version = "0.1.0", package = "ppaass-v3-agent-core" }
+ppaass-agent-core = { version = "0.1.1", package = "ppaass-v3-agent-core" }
 mimalloc = { version = "0.1.46" }
 toml = { version = "0.8.20" }
 clap = { version = "4.5.37", features = ["derive"] }
