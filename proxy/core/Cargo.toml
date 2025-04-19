@@ -2,6 +2,8 @@
 name = "ppaass-v3-proxy-core"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "The ppaass V3 proxy core library"
 [lib]
 crate-type = ["lib"]
 [dependencies]
