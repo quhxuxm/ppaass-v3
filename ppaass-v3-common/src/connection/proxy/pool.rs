@@ -1,4 +1,4 @@
-use crate::config::{ProxyTcpConnectionConfig, ProxyTcpConnectionPoolConfig};
+use crate::config::{RetrieveConnectionConfig, RetrieveConnectionPoolConfig};
 use crate::error::CommonError;
 use crate::user::UserInfo;
 use crate::{FramedConnection, ProxyTcpConnectionNewState, ProxyTcpConnectionTunnelCtlState};
@@ -13,7 +13,7 @@ use tokio::time::sleep;
 use tracing::{debug, error};
 struct ProxyTcpConnectionPoolElement<C>
 where
-    C: ProxyTcpConnectionPoolConfig + ProxyTcpConnectionConfig + Debug + Send + Sync + 'static,
+    C: RetrieveConnectionPoolConfig + RetrieveConnectionConfig + Debug + Send + Sync + 'static,
 {
     proxy_tcp_connection: FramedConnection<ProxyTcpConnectionTunnelCtlState>,
     create_time: DateTime<Utc>,
@@ -23,7 +23,7 @@ where
 }
 impl<C> ProxyTcpConnectionPoolElement<C>
 where
-    C: ProxyTcpConnectionPoolConfig + ProxyTcpConnectionConfig + Debug + Send + Sync + 'static,
+    C: RetrieveConnectionPoolConfig + RetrieveConnectionConfig + Debug + Send + Sync + 'static,
 {
     pub fn new(
         proxy_tcp_connection: FramedConnection<ProxyTcpConnectionTunnelCtlState>,
@@ -51,7 +51,7 @@ where
 /// The connection pool for proxy connection.
 pub struct ProxyTcpConnectionPool<C>
 where
-    C: ProxyTcpConnectionPoolConfig + ProxyTcpConnectionConfig + Debug + Send + Sync + 'static,
+    C: RetrieveConnectionPoolConfig + RetrieveConnectionConfig + Debug + Send + Sync + 'static,
 {
     /// The pool to store the proxy connection
     pool: Arc<Mutex<Vec<ProxyTcpConnectionPoolElement<C>>>>,
@@ -61,7 +61,7 @@ where
 }
 impl<C> ProxyTcpConnectionPool<C>
 where
-    C: ProxyTcpConnectionPoolConfig + ProxyTcpConnectionConfig + Debug + Send + Sync + 'static,
+    C: RetrieveConnectionPoolConfig + RetrieveConnectionConfig + Debug + Send + Sync + 'static,
 {
     /// Create the proxy connection pool
     pub async fn new(
@@ -259,8 +259,8 @@ where
                 match FramedConnection::<ProxyTcpConnectionNewState>::create(
                     &username,
                     &user_info,
-                    config.proxy_frame_size(),
-                    config.proxy_connect_timeout(),
+                    config.frame_size(),
+                    config.connect_timeout(),
                 )
                 .await
                 {

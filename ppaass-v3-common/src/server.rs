@@ -1,4 +1,4 @@
-use crate::config::ServerConfig;
+use crate::config::RetrieveServerConfig;
 use crate::error::CommonError;
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
@@ -49,7 +49,7 @@ impl ServerListener {
 #[async_trait::async_trait]
 pub trait Server<C>
 where
-    C: ServerConfig + Send + Sync + 'static,
+    C: RetrieveServerConfig + Send + Sync + 'static,
 {
     fn new(config: Arc<C>, server_state: ServerState) -> Self;
 
@@ -108,7 +108,7 @@ where
 
 pub struct CommonServer<C>
 where
-    C: ServerConfig + Send + Sync + 'static,
+    C: RetrieveServerConfig + Send + Sync + 'static,
 {
     config: Arc<C>,
     server_state: Arc<ServerState>,
@@ -117,7 +117,7 @@ where
 #[async_trait::async_trait]
 impl<C> Server<C> for CommonServer<C>
 where
-    C: ServerConfig + Send + Sync + 'static,
+    C: RetrieveServerConfig + Send + Sync + 'static,
 {
     fn new(config: Arc<C>, server_state: ServerState) -> Self {
         Self {

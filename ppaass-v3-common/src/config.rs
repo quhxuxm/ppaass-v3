@@ -1,6 +1,5 @@
 use serde::{Deserialize, Serialize};
-
-pub trait ProxyTcpConnectionPoolConfig {
+pub trait RetrieveConnectionPoolConfig {
     fn max_pool_size(&self) -> usize;
     fn fill_interval(&self) -> u64;
     fn check_interval(&self) -> u64;
@@ -9,28 +8,28 @@ pub trait ProxyTcpConnectionPoolConfig {
     fn retake_interval(&self) -> u64;
 }
 
-pub trait ProxyTcpConnectionConfig {
-    fn proxy_frame_size(&self) -> usize;
-    fn proxy_connect_timeout(&self) -> u64;
+pub trait RetrieveConnectionConfig {
+    fn frame_size(&self) -> usize;
+    fn connect_timeout(&self) -> u64;
 }
 
-pub trait ServerConfig {
+pub trait RetrieveServerConfig {
     fn worker_thread_number(&self) -> usize;
     fn server_port(&self) -> u16;
     fn ip_v6(&self) -> bool;
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct DefaultConnectionPoolConfig {
-    max_pool_size: usize,
-    fill_interval: u64,
-    check_interval: u64,
-    connection_max_alive: i64,
-    heartbeat_timeout: u64,
-    retake_interval: u64,
+pub struct ConnectionPoolConfig {
+    pub max_pool_size: usize,
+    pub fill_interval: u64,
+    pub check_interval: u64,
+    pub connection_max_alive: i64,
+    pub heartbeat_timeout: u64,
+    pub retake_interval: u64,
 }
 
-impl ProxyTcpConnectionPoolConfig for DefaultConnectionPoolConfig {
+impl RetrieveConnectionPoolConfig for ConnectionPoolConfig {
     fn max_pool_size(&self) -> usize {
         self.max_pool_size
     }
