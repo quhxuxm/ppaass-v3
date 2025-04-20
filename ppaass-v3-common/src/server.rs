@@ -57,7 +57,7 @@ impl<C> Server<C>
 where
     C: RetrieveServerConfig + Send + Sync + 'static,
 {
-    fn new(config: Arc<C>, server_state: ServerState) -> (Self, ServerGuard) {
+    pub fn new(config: Arc<C>, server_state: ServerState) -> (Self, ServerGuard) {
         let (upload_speed_event_sender, upload_speed_event_receiver) =
             channel::<UploadSpeedEvent>(1024);
         let (download_speed_event_sender, download_speed_event_receiver) =
