@@ -1,7 +1,10 @@
 use chrono::{DateTime, Local};
+#[derive(Debug)]
 pub struct UploadSpeedEvent {
     pub speed: u64,
 }
+
+#[derive(Debug)]
 pub struct DownloadSpeedEvent {
     pub speed: u64,
 }
