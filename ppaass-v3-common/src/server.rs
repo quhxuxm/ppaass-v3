@@ -88,7 +88,7 @@ where
         self.server_state.clone()
     }
 
-    async fn run<F1, Fut1, F2, Fut2>(
+    pub async fn run<F1, Fut1, F2, Fut2>(
         self,
         create_listener: F1,
         connection_handler: F2,
