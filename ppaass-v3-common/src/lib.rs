@@ -2,10 +2,13 @@ pub mod config;
 mod connection;
 pub mod crypto;
 pub mod error;
+pub mod event;
 pub mod server;
 pub mod user;
-use crate::crypto::{RsaCrypto, generate_aes_encryption_token, generate_blowfish_encryption_token};
+use crate::crypto::{generate_aes_encryption_token, generate_blowfish_encryption_token, RsaCrypto};
 use crate::error::CommonError;
+use crate::event::{LogEvent, LogEventLevel};
+use chrono::{DateTime, Local, NaiveDateTime, NaiveTime};
 pub use connection::*;
 pub use ppaass_protocol::*;
 use rand::random;
@@ -13,7 +16,8 @@ use std::borrow::Cow;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::path::Path;
 use std::str::FromStr;
-use tracing::Level;
+use tokio::sync::mpsc::Sender;
+use tracing::{error, Level};
 use tracing_appender::non_blocking::WorkerGuard;
 use tracing_subscriber::fmt::time::ChronoUtc;
 use uuid::Uuid;
@@ -107,4 +111,21 @@ where
         .flatten()
         .collect::<Vec<SocketAddr>>();
     Ok(proxy_addresses)
+}
+
+pub async fn publish_server_log_event(
+    log_event_sender: &Sender<LogEvent>,
+    log_event_level: LogEventLevel,
+    message: String,
+) {
+    if let Err(e) = log_event_sender
+        .send(LogEvent {
+            level: log_event_level,
+            timestamp: Local::now(),
+            message,
+        })
+        .await
+    {
+        error!("Fail to send log event: {e:?}");
+    }
 }
