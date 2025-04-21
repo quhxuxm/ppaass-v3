@@ -38,7 +38,7 @@ sudo mkdir /ppaass-v3/build/resources/agent_user
 sudo mkdir /ppaass-v3/build/resources/forward_user
 # Pull ppaass
 cd /ppaass-v3/sourcecode
-sudo git clone -b main https://github.com/quhxuxm/ppaass-v3.git ppaass-v3
+sudo git clone -b 1.0 https://github.com/quhxuxm/ppaass-v3.git ppaass-v3
 sudo chmod 777 ppaass-v3
 cd /ppaass-v3/sourcecode/ppaass-v3
 sudo git pull
