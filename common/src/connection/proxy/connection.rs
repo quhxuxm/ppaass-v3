@@ -22,23 +22,23 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 use std::time::Duration;
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::net::TcpStream;
 use tokio::pin;
 use tokio::time::timeout;
-use tokio_tfo::TfoStream;
 use tokio_util::bytes::BytesMut;
 use tokio_util::codec::{Framed, FramedParts};
 use tokio_util::io::{SinkWriter, StreamReader};
 use tracing::debug;
 pub struct ProxyTcpConnectionNewState {}
 pub struct ProxyTcpConnectionTunnelCtlState {
-    tunnel_ctl_response_request_framed: Framed<TfoStream, TunnelControlResponseRequestCodec>,
+    tunnel_ctl_response_request_framed: Framed<TcpStream, TunnelControlResponseRequestCodec>,
     proxy_encryption: Arc<Encryption>,
     agent_encryption: Arc<Encryption>,
 }
 
 pub struct ProxyTcpConnectionRelayState {
     crypto_tcp_read_write:
-        SinkWriter<StreamReader<CryptoLengthDelimitedFramed<TfoStream>, BytesMut>>,
+        SinkWriter<StreamReader<CryptoLengthDelimitedFramed<TcpStream>, BytesMut>>,
 }
 #[derive(Debug, Clone)]
 pub struct ProxyTcpConnectionInfo {
@@ -101,7 +101,7 @@ impl ProxyTcpConnection<ProxyTcpConnectionNewState> {
             random::<u64>() % proxy_tcp_connection_info.proxy_addresses.len() as u64;
         let proxy_tcp_stream = timeout(
             Duration::from_secs(proxy_tcp_connection_info.connect_timeout()),
-            TfoStream::connect(
+            TcpStream::connect(
                 proxy_tcp_connection_info.proxy_addresses()[proxy_address_index as usize],
             ),
         )

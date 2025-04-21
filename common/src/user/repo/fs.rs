@@ -1,3 +1,4 @@
+use std::ascii::AsciiExt;
 use crate::crypto::RsaCrypto;
 use crate::error::CommonError;
 use crate::user::{UserInfo, UserInfoRepository};
@@ -50,6 +51,9 @@ impl FileSystemUserInfoRepository {
                 );
                 return;
             };
+            if username.eq_ignore_ascii_case(".DS_Store"){
+                return 
+            }
             let user_info_config_file_path = user_repo_dir_path.join(username).join(FS_USER_INFO_CONFIG_FILE_NAME);
             let user_info_config_file_content = match std::fs::read_to_string(&user_info_config_file_path) {
                 Ok(content) => content,

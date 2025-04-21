@@ -6,7 +6,7 @@ use std::future::Future;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
-use tokio_tfo::{TfoListener, TfoStream};
+
 use tracing::{error, info};
 
 pub struct ServerState {
@@ -36,7 +36,6 @@ impl ServerState {
 
 pub enum ServerTcpStream {
     TcpStream(TcpStream),
-    TfoStream(TfoStream),
 }
 impl ServerTcpStream {
     pub(crate) fn set_nodelay(&self, val: bool) -> Result<(), CommonError> {
@@ -45,16 +44,11 @@ impl ServerTcpStream {
                 stream.set_nodelay(val)?;
                 Ok(())
             }
-            ServerTcpStream::TfoStream(stream) => {
-                stream.set_nodelay(val)?;
-                Ok(())
-            }
         }
     }
 }
 pub enum ServerListener {
     TcpListener(TcpListener),
-    TfoListener(TfoListener),
 }
 
 impl ServerListener {
@@ -63,10 +57,6 @@ impl ServerListener {
             ServerListener::TcpListener(tcp_listener) => {
                 let accept_result = tcp_listener.accept().await?;
                 Ok((ServerTcpStream::TcpStream(accept_result.0), accept_result.1))
-            }
-            ServerListener::TfoListener(tfo_listener) => {
-                let accept_result = tfo_listener.accept().await?;
-                Ok((ServerTcpStream::TfoStream(accept_result.0), accept_result.1))
             }
         }
     }

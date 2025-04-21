@@ -7,7 +7,7 @@ use ppaass_common::{
 };
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::Arc;
-use tokio::net::UdpSocket;
+use tokio::net::{TcpStream, UdpSocket};
 use tokio::sync::Mutex;
 use tokio_tfo::TfoStream;
 use tokio_util::bytes::BytesMut;
@@ -23,7 +23,7 @@ impl DestinationUdpEndpoint {
     pub async fn replay(
         &self,
         agent_tcp_connection: Arc<
-            Mutex<AgentTcpConnection<AgentTcpConnectionUdpRelayState<TfoStream>>>,
+            Mutex<AgentTcpConnection<AgentTcpConnectionUdpRelayState<TcpStream>>>,
         >,
         data: &[u8],
         source_address: UnifiedAddress,

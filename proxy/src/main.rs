@@ -19,6 +19,7 @@ use ppaass_common::error::CommonError;
 use ppaass_common::user::repo::fs::FileSystemUserInfoRepository;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::net::TcpListener;
 use tokio::runtime::Builder;
 use tokio_tfo::TfoListener;
 use tracing::{debug, error, trace};
@@ -33,8 +34,8 @@ async fn create_server_listener(config: Arc<ProxyConfig>) -> Result<ServerListen
             "Starting server listener with IPv6 on port: {}",
             config.server_port()
         );
-        Ok(ServerListener::TfoListener(
-            TfoListener::bind(SocketAddr::new(
+        Ok(ServerListener::TcpListener(
+            TcpListener::bind(SocketAddr::new(
                 IpAddr::V6(Ipv6Addr::UNSPECIFIED),
                 config.server_port(),
             ))
@@ -45,8 +46,8 @@ async fn create_server_listener(config: Arc<ProxyConfig>) -> Result<ServerListen
             "Starting server listener with IPv4 on port: {}",
             config.server_port()
         );
-        Ok(ServerListener::TfoListener(
-            TfoListener::bind(SocketAddr::new(
+        Ok(ServerListener::TcpListener(
+            TcpListener::bind(SocketAddr::new(
                 IpAddr::V4(Ipv4Addr::UNSPECIFIED),
                 config.server_port(),
             ))

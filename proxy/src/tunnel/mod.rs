@@ -13,6 +13,7 @@ use ppaass_common::{
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::io::{copy_bidirectional, copy_bidirectional_with_sizes};
+use tokio::net::TcpStream;
 use tokio::sync::Mutex;
 use tokio_tfo::TfoStream;
 use tokio_util::io::{SinkWriter, StreamReader};
@@ -21,7 +22,7 @@ mod destination;
 
 pub struct Tunnel {
     config: Arc<ProxyConfig>,
-    agent_tcp_connection: AgentTcpConnection<AgentTcpConnectionTunnelCtlState<TfoStream>>,
+    agent_tcp_connection: AgentTcpConnection<AgentTcpConnectionTunnelCtlState<TcpStream>>,
     agent_socket_address: SocketAddr,
     server_state: Arc<ServerState>,
 }
@@ -30,7 +31,7 @@ impl Tunnel {
     pub async fn new(
         config: Arc<ProxyConfig>,
         server_state: Arc<ServerState>,
-        agent_tcp_stream: TfoStream,
+        agent_tcp_stream: TcpStream,
         agent_socket_address: SocketAddr,
     ) -> Result<Self, CommonError> {
         let user_repo = server_state
@@ -192,7 +193,7 @@ pub async fn handle_agent_connection(
     agent_tcp_stream: ServerTcpStream,
     agent_socket_address: SocketAddr,
 ) -> Result<(), CommonError> {
-    let ServerTcpStream::TfoStream(agent_tcp_stream) = agent_tcp_stream else {
+    let ServerTcpStream::TcpStream(agent_tcp_stream) = agent_tcp_stream else {
         return Err(CommonError::Other(format!(
             "Proxy server should use tfo stream: {agent_socket_address}"
         )));
